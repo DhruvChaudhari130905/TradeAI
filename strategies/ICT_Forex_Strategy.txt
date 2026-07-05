@@ -1,0 +1,96 @@
+ICT FOREX TRADING STRATEGY (PLAIN ENGLISH)
+
+DISCLAIMER
+
+This strategy is for educational and backtesting purposes only. It does
+not guarantee profits.
+
+MARKET
+
+-   Pair: EUR/USD (can also be tested on GBP/USD)
+-   Timeframe: 5 Minute
+-   Higher Timeframe: 15 Minute
+
+TOOLS
+
+1.  20 EMA
+2.  Previous Day High
+3.  Previous Day Low
+4.  Session High and Low (London and New York)
+5.  Fair Value Gap (FVG)
+6.  Market Structure (Higher Highs, Higher Lows, Lower Highs, Lower
+    Lows)
+
+RULES
+
+STEP 1 – DETERMINE THE TREND - Open the 15-minute chart. - If price is
+making higher highs and higher lows, only look for BUY trades. - If
+price is making lower highs and lower lows, only look for SELL trades. -
+Ignore trades against the trend.
+
+STEP 2 – WAIT FOR A LIQUIDITY SWEEP For a BUY: - Wait until price moves
+below a recent swing low or the previous day’s low. - Price should
+quickly move back above that level.
+
+For a SELL: - Wait until price moves above a recent swing high or the
+previous day’s high. - Price should quickly move back below that level.
+
+STEP 3 – WAIT FOR MARKET STRUCTURE SHIFT BUY: - After sweeping a low,
+wait until price breaks a recent lower high.
+
+SELL: - After sweeping a high, wait until price breaks a recent higher
+low.
+
+Do not enter before this confirmation.
+
+STEP 4 – FIND A FAIR VALUE GAP BUY: - Look for a bullish Fair Value Gap
+after the structure shift.
+
+SELL: - Look for a bearish Fair Value Gap after the structure shift.
+
+STEP 5 – ENTRY BUY: - Place a Buy Limit at the Fair Value Gap. OR -
+Enter at market if price immediately rejects from the gap.
+
+SELL: - Place a Sell Limit at the Fair Value Gap. OR - Enter at market
+if price rejects from the gap.
+
+STOP LOSS
+
+BUY: - Place the stop below the liquidity sweep low.
+
+SELL: - Place the stop above the liquidity sweep high.
+
+TAKE PROFIT
+
+Target one of these: - Next swing high/low - Previous day’s high or
+low - Risk to Reward of at least 1:2
+
+RISK MANAGEMENT
+
+-   Risk only 1% of account per trade.
+-   Maximum 2 trades per day.
+-   Stop trading after 2 losses.
+-   Never move the stop loss further away.
+
+TRADE CHECKLIST
+
+Before entering: [ ] Trend matches direction. [ ] Liquidity sweep
+occurred. [ ] Market structure shifted. [ ] Fair Value Gap formed. [ ]
+Risk-to-Reward is at least 1:2. [ ] Risk is within limits.
+
+BACKTEST RULES
+
+-   Test at least 100 trades.
+-   Record:
+    -   Date
+    -   Time
+    -   Pair
+    -   Entry
+    -   Stop Loss
+    -   Take Profit
+    -   Win or Loss
+    -   Risk-to-Reward
+    -   Notes
+
+Do not change the rules during the test. Only evaluate performance after
+all trades are completed.

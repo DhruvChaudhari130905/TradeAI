@@ -1,0 +1,357 @@
+====================================================
+MEAN REVERSION FOREX TRADING STRATEGY
+Version: 1.0
+Style: Mean Reversion
+Market: Forex
+
+Recommended Currency Pairs:
+- EUR/USD
+- GBP/USD
+- USD/JPY
+- AUD/USD
+- NZD/USD
+- USD/CAD
+- EUR/JPY
+- GBP/JPY
+
+Timeframes:
+Trend Filter: 4H
+Setup: 1H
+Entry: 15M
+
+====================================================
+OBJECTIVE
+====================================================
+
+Identify situations where price has moved significantly
+away from its average and trade the expected return
+toward the mean.
+
+This strategy works best in ranging or slow-moving markets.
+
+====================================================
+TOOLS
+====================================================
+
+Indicators:
+
+- 20 EMA
+- Bollinger Bands (20, 2)
+- RSI (14)
+- ATR (14)
+
+====================================================
+STEP 1: DETERMINE MARKET CONDITION
+====================================================
+
+Trade only when:
+
+- Price is moving sideways.
+- 20 EMA is relatively flat.
+- No strong trend exists.
+- Price repeatedly oscillates around the 20 EMA.
+
+Do NOT trade if:
+
+- Price is making strong higher highs and higher lows.
+- Price is making strong lower highs and lower lows.
+- Major breakout has recently occurred.
+
+====================================================
+STEP 2: LONG SETUP
+====================================================
+
+Conditions:
+
+1. Price touches or closes below the lower Bollinger Band.
+2. RSI is below 30.
+3. Price remains above major long-term support.
+4. A bullish reversal candle forms.
+
+Accepted confirmation candles:
+
+- Bullish Engulfing
+- Bullish Pin Bar
+- Hammer
+
+====================================================
+LONG ENTRY
+====================================================
+
+Enter Buy:
+
+At the close of the bullish confirmation candle.
+
+====================================================
+STEP 3: SHORT SETUP
+====================================================
+
+Conditions:
+
+1. Price touches or closes above the upper Bollinger Band.
+2. RSI is above 70.
+3. Price remains below major long-term resistance.
+4. A bearish reversal candle forms.
+
+Accepted confirmation candles:
+
+- Bearish Engulfing
+- Shooting Star
+- Bearish Pin Bar
+
+====================================================
+SHORT ENTRY
+====================================================
+
+Enter Sell:
+
+At the close of the bearish confirmation candle.
+
+====================================================
+STOP LOSS
+====================================================
+
+Long Trade
+
+Place stop loss:
+
+- Below the recent swing low
+
+OR
+
+- 1.5 × ATR below entry
+
+Use whichever is further.
+
+----------------------------------------------------
+
+Short Trade
+
+Place stop loss:
+
+- Above recent swing high
+
+OR
+
+- 1.5 × ATR above entry
+
+Use whichever is further.
+
+====================================================
+TAKE PROFIT
+====================================================
+
+Primary Target
+
+Exit when price reaches:
+
+20 EMA
+
+----------------------------------------------------
+
+Secondary Target
+
+Exit at the opposite Bollinger Band.
+
+----------------------------------------------------
+
+Alternative
+
+Use a fixed
+
+1 : 2
+
+Risk Reward Ratio.
+
+====================================================
+TRADE MANAGEMENT
+====================================================
+
+At +1R:
+
+Move stop loss to Break Even.
+
+At +1.5R:
+
+Optionally close 50% of the position.
+
+Allow remaining position to reach:
+
+- 20 EMA
+OR
+- Opposite Bollinger Band
+
+====================================================
+FALSE SIGNAL FILTER
+====================================================
+
+Do NOT enter if:
+
+- Candle closes far outside the Bollinger Band with strong momentum.
+- High-impact news is due within 30 minutes.
+- RSI remains extreme for multiple candles during a strong trend.
+- ATR is expanding rapidly after a breakout.
+
+====================================================
+OPTIONAL DIVERGENCE FILTER
+====================================================
+
+Increase confidence when:
+
+Long Trade:
+
+Price makes a lower low
+while RSI makes a higher low.
+
+----------------------------------------------------
+
+Short Trade:
+
+Price makes a higher high
+while RSI makes a lower high.
+
+====================================================
+RISK MANAGEMENT
+====================================================
+
+Risk per trade:
+
+1%
+
+Maximum:
+
+2%
+
+Maximum daily loss:
+
+3%
+
+Maximum weekly loss:
+
+6%
+
+Stop trading after:
+
+3 consecutive losing trades.
+
+====================================================
+BEST TRADING SESSIONS
+====================================================
+
+Preferred:
+
+- London Session
+- Early New York Session
+
+Avoid:
+
+- Late Friday
+- Holidays
+- Major news releases
+
+====================================================
+VALID SETUPS
+====================================================
+
+Trade:
+
+- Bollinger Band Rejections
+- RSI Overbought/Oversold Reversals
+- Support Bounce
+- Resistance Rejection
+- Double Top
+- Double Bottom
+
+Avoid:
+
+- Strong breakouts
+- Trending markets
+- News-driven volatility
+
+====================================================
+LONG TRADE EXAMPLE
+====================================================
+
+Currency Pair:
+
+EUR/USD
+
+Price touches the lower Bollinger Band.
+
+RSI = 24.
+
+Bullish engulfing candle forms.
+
+Entry:
+
+Buy at candle close.
+
+Stop:
+
+Below swing low.
+
+Target:
+
+20 EMA
+
+or
+
+Upper Bollinger Band.
+
+====================================================
+SHORT TRADE EXAMPLE
+====================================================
+
+Currency Pair:
+
+GBP/USD
+
+Price reaches the upper Bollinger Band.
+
+RSI = 75.
+
+Bearish shooting star forms.
+
+Entry:
+
+Sell at candle close.
+
+Stop:
+
+Above swing high.
+
+Target:
+
+20 EMA
+
+or
+
+Lower Bollinger Band.
+
+====================================================
+RULES SUMMARY
+====================================================
+
+✓ Trade only in ranging markets.
+
+✓ Wait for price to reach Bollinger Bands.
+
+✓ Confirm with RSI.
+
+✓ Wait for reversal candlestick.
+
+✓ Risk only 1% per trade.
+
+✓ Use ATR-based stop loss.
+
+✓ Exit near the mean.
+
+✓ Avoid strong trends.
+
+✓ Avoid major news.
+
+✓ Journal every trade.
+
+====================================================
+END OF STRATEGY
+====================================================

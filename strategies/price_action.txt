@@ -1,0 +1,323 @@
+====================================================
+PRICE ACTION FOREX TRADING STRATEGY
+Version: 1.0
+Style: Trend Following with Price Action
+Market: Forex
+Recommended Pairs:
+- EUR/USD
+- GBP/USD
+- USD/JPY
+- AUD/USD
+- USD/CAD
+- NZD/USD
+- EUR/JPY
+- GBP/JPY
+
+Timeframes:
+Trend: 4H
+Setup: 1H
+Entry: 15M
+
+====================================================
+OBJECTIVE
+====================================================
+
+Trade only in the direction of the overall trend using naked price action.
+No oscillators or lagging indicators are required.
+
+====================================================
+TOOLS
+====================================================
+
+Charts only.
+
+Optional:
+- 200 EMA (trend filter only)
+
+No RSI
+No MACD
+No Bollinger Bands
+
+====================================================
+STEP 1: DETERMINE TREND
+====================================================
+
+Bullish Trend
+--------------
+- Higher Highs
+- Higher Lows
+
+Bearish Trend
+--------------
+- Lower Highs
+- Lower Lows
+
+If price is moving sideways for more than 20 candles,
+DO NOT TRADE.
+
+====================================================
+STEP 2: MARK IMPORTANT LEVELS
+====================================================
+
+Draw horizontal lines at:
+
+- Previous Daily High
+- Previous Daily Low
+- Weekly High
+- Weekly Low
+- Major Swing Highs
+- Major Swing Lows
+
+These become support and resistance zones.
+
+====================================================
+STEP 3: WAIT FOR A PULLBACK
+====================================================
+
+Never chase price.
+
+Wait until price pulls back toward:
+
+- Support in an uptrend
+OR
+- Resistance in a downtrend
+
+The pullback should consist of several candles and show slowing momentum.
+
+====================================================
+STEP 4: ENTRY SIGNAL
+====================================================
+
+Long Entry
+
+Requirements:
+
+1. Uptrend
+2. Pullback into support
+3. Bullish rejection candle
+
+Accepted candles:
+
+- Bullish Pin Bar
+- Bullish Engulfing
+- Strong Bullish Outside Bar
+
+Enter at the close of the confirmation candle
+or
+Place a Buy Stop 2 pips above its high.
+
+----------------------------------------------------
+
+Short Entry
+
+Requirements:
+
+1. Downtrend
+2. Pullback into resistance
+3. Bearish rejection candle
+
+Accepted candles:
+
+- Bearish Pin Bar
+- Bearish Engulfing
+- Strong Bearish Outside Bar
+
+Enter at candle close
+or
+Sell Stop 2 pips below its low.
+
+====================================================
+STOP LOSS
+====================================================
+
+Long Trade
+
+Place stop loss:
+
+- Below the rejection candle
+OR
+- Below the recent swing low
+
+Add 3-5 pip buffer.
+
+----------------------------------------------------
+
+Short Trade
+
+Place stop:
+
+- Above rejection candle
+OR
+- Above recent swing high
+
+Add 3-5 pip buffer.
+
+====================================================
+TAKE PROFIT
+====================================================
+
+Primary target:
+
+Risk Reward = 1:2
+
+Example:
+
+Risk = 30 pips
+
+Target = 60 pips
+
+Alternative exits:
+
+- Next resistance
+- Next support
+- Previous swing high
+- Previous swing low
+
+====================================================
+TRADE MANAGEMENT
+====================================================
+
+When trade reaches +1R:
+
+Move stop to Break Even.
+
+When trade reaches +1.5R:
+
+Optionally close 50%.
+
+Allow remaining position to reach target.
+
+====================================================
+RISK MANAGEMENT
+====================================================
+
+Risk per trade:
+
+1%
+
+Maximum:
+
+2%
+
+Maximum daily loss:
+
+3%
+
+Maximum weekly loss:
+
+6%
+
+Stop trading after:
+
+3 consecutive losing trades.
+
+====================================================
+FILTERS
+====================================================
+
+Do NOT trade:
+
+- During major economic news
+- During low liquidity
+- During holidays
+- During ranging markets
+
+Trade only during:
+
+London Session
+
+or
+
+London + New York overlap.
+
+====================================================
+VALID PATTERNS
+====================================================
+
+Use only:
+
+- Pin Bar
+- Bullish Engulfing
+- Bearish Engulfing
+- Inside Bar Breakout
+- Outside Bar
+- Break and Retest
+- Trend Continuation
+
+Avoid:
+
+- Doji
+- Tiny candles
+- Choppy consolidation
+
+====================================================
+EXAMPLE LONG TRADE
+====================================================
+
+EUR/USD
+
+Trend:
+Higher highs and higher lows.
+
+Price retraces to previous support.
+
+Bullish pin bar forms.
+
+Entry:
+Buy above pin bar.
+
+Stop:
+Below pin bar.
+
+Target:
+2 × stop distance.
+
+====================================================
+EXAMPLE SHORT TRADE
+====================================================
+
+GBP/USD
+
+Trend:
+Lower highs and lower lows.
+
+Price retraces to resistance.
+
+Bearish engulfing candle forms.
+
+Entry:
+Sell below engulfing candle.
+
+Stop:
+Above candle.
+
+Target:
+2 × stop distance.
+
+====================================================
+RULES SUMMARY
+====================================================
+
+✓ Trade only with trend.
+
+✓ Wait for pullback.
+
+✓ Enter only after confirmation candle.
+
+✓ Always use stop loss.
+
+✓ Minimum 1:2 Risk Reward.
+
+✓ Risk only 1% per trade.
+
+✓ Avoid news events.
+
+✓ Never revenge trade.
+
+✓ Do not move stop loss further away.
+
+✓ Journal every trade.
+
+====================================================
+END OF STRATEGY
+====================================================

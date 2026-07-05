@@ -1,0 +1,214 @@
+====================================================
+SUPPORT & RESISTANCE FOREX TRADING STRATEGY
+Version: 1.0
+Style: Support & Resistance
+Market: Forex
+
+Recommended Currency Pairs:
+- EUR/USD
+- GBP/USD
+- USD/JPY
+- AUD/USD
+- NZD/USD
+- USD/CAD
+- EUR/JPY
+- GBP/JPY
+
+Timeframes:
+Trend: 4H
+Setup: 1H
+Entry: 15M
+
+====================================================
+OBJECTIVE
+====================================================
+
+Trade reversals from strong support and resistance levels
+using candlestick confirmation.
+
+====================================================
+TOOLS
+====================================================
+
+Indicators:
+
+- 200 EMA (Trend Filter)
+- ATR (14)
+
+No oscillators required.
+
+====================================================
+STEP 1: IDENTIFY TREND
+====================================================
+
+Bullish:
+
+- Price above 200 EMA
+
+Bearish:
+
+- Price below 200 EMA
+
+Trade only in the direction of the trend.
+
+====================================================
+STEP 2: DRAW LEVELS
+====================================================
+
+Mark:
+
+- Previous Daily High
+- Previous Daily Low
+- Weekly High
+- Weekly Low
+- Swing Highs
+- Swing Lows
+
+A level becomes valid after at least
+2 touches without breaking.
+
+====================================================
+STEP 3: WAIT FOR PRICE
+====================================================
+
+Do not enter immediately.
+
+Wait until price reaches a marked level.
+
+====================================================
+LONG ENTRY
+====================================================
+
+Conditions:
+
+1. Uptrend.
+2. Price touches support.
+3. Bullish rejection candle forms.
+
+Valid candles:
+
+- Hammer
+- Bullish Engulfing
+- Bullish Pin Bar
+
+Entry:
+
+Buy at candle close.
+
+====================================================
+SHORT ENTRY
+====================================================
+
+Conditions:
+
+1. Downtrend.
+2. Price touches resistance.
+3. Bearish rejection candle forms.
+
+Valid candles:
+
+- Shooting Star
+- Bearish Engulfing
+- Bearish Pin Bar
+
+Entry:
+
+Sell at candle close.
+
+====================================================
+STOP LOSS
+====================================================
+
+Long:
+
+Below support or swing low.
+
+Short:
+
+Above resistance or swing high.
+
+Minimum distance:
+
+1.5 × ATR
+
+====================================================
+TAKE PROFIT
+====================================================
+
+Primary:
+
+Risk Reward = 1:2
+
+Alternative:
+
+Next support or resistance level.
+
+====================================================
+TRADE MANAGEMENT
+====================================================
+
++1R
+
+Move stop to break even.
+
++2R
+
+Close 50%.
+
+Trail remaining position behind
+new swing highs/lows.
+
+====================================================
+FILTERS
+====================================================
+
+Avoid:
+
+- Major news
+- Sideways markets
+- Weak levels
+- Less than two touches
+
+====================================================
+RISK MANAGEMENT
+====================================================
+
+Risk:
+
+1% per trade
+
+Maximum:
+
+2%
+
+Daily loss:
+
+3%
+
+Weekly loss:
+
+6%
+
+Stop after:
+
+3 losing trades.
+
+====================================================
+RULES SUMMARY
+====================================================
+
+✓ Trade with trend.
+
+✓ Use confirmed support/resistance.
+
+✓ Wait for rejection candle.
+
+✓ Risk 1%.
+
+✓ Minimum 2:1 Reward/Risk.
+
+✓ Never chase price.
+
+====================================================
+END OF STRATEGY
+====================================================

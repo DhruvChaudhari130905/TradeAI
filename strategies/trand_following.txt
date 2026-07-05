@@ -1,0 +1,368 @@
+====================================================
+TREND FOLLOWING FOREX TRADING STRATEGY
+Version: 1.0
+Style: Trend Following
+Market: Forex
+
+Recommended Currency Pairs:
+- EUR/USD
+- GBP/USD
+- USD/JPY
+- AUD/USD
+- NZD/USD
+- USD/CAD
+- EUR/JPY
+- GBP/JPY
+
+Timeframes:
+Trend: Daily
+Setup: 4H
+Entry: 1H
+
+====================================================
+OBJECTIVE
+====================================================
+
+Capture large market trends by trading only in the direction
+of the prevailing trend.
+
+This strategy focuses on staying in winning trades as long
+as possible while cutting losing trades quickly.
+
+====================================================
+TOOLS
+====================================================
+
+Indicators:
+
+- 50 EMA
+- 200 EMA
+- ATR (14)
+
+====================================================
+STEP 1: DETERMINE THE TREND
+====================================================
+
+Bullish Trend
+
+Conditions:
+
+- Price is above the 200 EMA.
+- 50 EMA is above the 200 EMA.
+- Both EMAs are sloping upward.
+
+----------------------------------------------------
+
+Bearish Trend
+
+Conditions:
+
+- Price is below the 200 EMA.
+- 50 EMA is below the 200 EMA.
+- Both EMAs are sloping downward.
+
+----------------------------------------------------
+
+No Trade
+
+Do not trade if:
+
+- EMAs are crossing frequently.
+- Price is moving sideways.
+- EMAs are flat.
+
+====================================================
+STEP 2: WAIT FOR A PULLBACK
+====================================================
+
+Never enter immediately after a strong move.
+
+Wait until price retraces toward:
+
+- 50 EMA
+OR
+- Recent swing level
+
+The pullback should be controlled and consist of
+small candles rather than aggressive reversals.
+
+====================================================
+STEP 3: ENTRY CONDITIONS
+====================================================
+
+LONG TRADE
+
+Requirements:
+
+1. Bullish trend confirmed.
+2. Price pulls back to the 50 EMA.
+3. A bullish confirmation candle forms.
+
+Accepted confirmation candles:
+
+- Bullish Engulfing
+- Bullish Pin Bar
+- Strong Bullish Candle
+
+Enter at the close of the confirmation candle.
+
+----------------------------------------------------
+
+SHORT TRADE
+
+Requirements:
+
+1. Bearish trend confirmed.
+2. Price pulls back to the 50 EMA.
+3. A bearish confirmation candle forms.
+
+Accepted confirmation candles:
+
+- Bearish Engulfing
+- Bearish Pin Bar
+- Strong Bearish Candle
+
+Enter at the close of the confirmation candle.
+
+====================================================
+STOP LOSS
+====================================================
+
+Long Trade
+
+Place stop loss:
+
+- Below recent swing low
+
+OR
+
+- 1.5 × ATR below entry
+
+Use whichever distance is larger.
+
+----------------------------------------------------
+
+Short Trade
+
+Place stop loss:
+
+- Above recent swing high
+
+OR
+
+- 1.5 × ATR above entry
+
+Use whichever distance is larger.
+
+====================================================
+POSITION SIZE
+====================================================
+
+Risk per trade:
+
+1%
+
+Maximum:
+
+2%
+
+Calculate lot size using stop-loss distance.
+
+====================================================
+TAKE PROFIT
+====================================================
+
+Primary Method
+
+No fixed target.
+
+Hold the trade until trend ends.
+
+Exit when:
+
+- Price closes on the opposite side of the 50 EMA.
+
+OR
+
+- 50 EMA crosses the 200 EMA.
+
+----------------------------------------------------
+
+Alternative Method
+
+Take partial profit at:
+
+2R
+
+Move stop loss to break even.
+
+Allow remaining position to ride the trend.
+
+====================================================
+TRAILING STOP
+====================================================
+
+Option 1
+
+Trail below each new swing low.
+
+----------------------------------------------------
+
+Option 2
+
+Trail using:
+
+2 × ATR
+
+====================================================
+EXIT CONDITIONS
+====================================================
+
+Exit immediately if:
+
+- Trend reverses.
+- Opposite EMA crossover occurs.
+- Strong reversal candle appears after extended trend.
+- Major economic event causes abnormal volatility.
+
+====================================================
+FILTERS
+====================================================
+
+Avoid trading:
+
+- During major economic news.
+- During holidays.
+- During extremely low volatility.
+- During narrow ranging markets.
+
+Trade during:
+
+- London Session.
+- New York Session.
+- London/New York overlap.
+
+====================================================
+RISK MANAGEMENT
+====================================================
+
+Maximum daily loss:
+
+3%
+
+Maximum weekly loss:
+
+6%
+
+Stop trading after:
+
+3 consecutive losing trades.
+
+Never increase risk after a loss.
+
+====================================================
+VALID SETUPS
+====================================================
+
+Only trade:
+
+- EMA pullbacks
+- Trend continuation
+- Break and retest
+- Bull flags
+- Bear flags
+- Strong impulse followed by controlled correction
+
+Avoid:
+
+- Choppy markets
+- Sideways ranges
+- Counter-trend trades
+
+====================================================
+LONG TRADE EXAMPLE
+====================================================
+
+Currency Pair:
+
+EUR/USD
+
+Trend:
+
+Price above both EMAs.
+
+50 EMA above 200 EMA.
+
+Price pulls back to the 50 EMA.
+
+Bullish engulfing candle forms.
+
+Entry:
+
+Buy at candle close.
+
+Stop:
+
+Below recent swing low.
+
+Exit:
+
+Trail stop until price closes below the 50 EMA.
+
+====================================================
+SHORT TRADE EXAMPLE
+====================================================
+
+Currency Pair:
+
+GBP/USD
+
+Trend:
+
+Price below both EMAs.
+
+50 EMA below 200 EMA.
+
+Price retraces to the 50 EMA.
+
+Bearish pin bar forms.
+
+Entry:
+
+Sell at candle close.
+
+Stop:
+
+Above recent swing high.
+
+Exit:
+
+Trail stop until price closes above the 50 EMA.
+
+====================================================
+RULES SUMMARY
+====================================================
+
+✓ Trade only with the primary trend.
+
+✓ Wait for pullbacks.
+
+✓ Never chase price.
+
+✓ Confirm entry with price action.
+
+✓ Risk only 1% per trade.
+
+✓ Use ATR-based stop loss.
+
+✓ Let winners run.
+
+✓ Cut losers quickly.
+
+✓ Never average down.
+
+✓ Journal every trade.
+
+====================================================
+END OF STRATEGY
+====================================================

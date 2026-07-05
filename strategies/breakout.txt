@@ -1,0 +1,354 @@
+====================================================
+BREAKOUT FOREX TRADING STRATEGY
+Version: 1.0
+Style: Breakout Trading
+Market: Forex
+
+Recommended Currency Pairs:
+- EUR/USD
+- GBP/USD
+- USD/JPY
+- AUD/USD
+- NZD/USD
+- USD/CAD
+- EUR/JPY
+- GBP/JPY
+
+Timeframes:
+Trend: 4H
+Setup: 1H
+Entry: 15M
+
+====================================================
+OBJECTIVE
+====================================================
+
+Identify periods of consolidation and enter trades when price
+breaks out with strong momentum.
+
+The goal is to capture the beginning of a new trend.
+
+====================================================
+TOOLS
+====================================================
+
+Indicators (Optional):
+
+- 20 EMA
+- ATR (14)
+- Volume (if available)
+
+No oscillators are required.
+
+====================================================
+STEP 1: IDENTIFY CONSOLIDATION
+====================================================
+
+Look for a tight trading range where:
+
+- Price moves sideways.
+- At least 8 consecutive candles remain within the range.
+- Highs and lows are relatively equal.
+- Volatility decreases.
+
+Mark:
+
+- Highest High of the range.
+- Lowest Low of the range.
+
+This forms the breakout zone.
+
+====================================================
+STEP 2: CONFIRM MARKET CONDITIONS
+====================================================
+
+Trade only when:
+
+- No major economic news is scheduled within the next 30 minutes.
+- Market is not extremely volatile due to unexpected events.
+- The breakout occurs during active trading sessions.
+
+Preferred sessions:
+
+- London Session
+- New York Session
+- London/New York overlap
+
+====================================================
+STEP 3: LONG ENTRY
+====================================================
+
+Conditions:
+
+1. Price closes above the consolidation high.
+2. Breakout candle closes outside the range.
+3. Candle body is larger than the average of the previous 5 candles.
+4. Breakout is not immediately rejected.
+
+Entry:
+
+Buy at the close of the breakout candle.
+
+Alternative:
+
+Place a Buy Stop 2 pips above the breakout candle high.
+
+====================================================
+STEP 4: SHORT ENTRY
+====================================================
+
+Conditions:
+
+1. Price closes below the consolidation low.
+2. Candle closes outside the range.
+3. Strong bearish breakout candle.
+4. No immediate rejection.
+
+Entry:
+
+Sell at the close of the breakout candle.
+
+Alternative:
+
+Place a Sell Stop 2 pips below the breakout candle low.
+
+====================================================
+STOP LOSS
+====================================================
+
+Long Trade
+
+Place stop loss:
+
+- Below the breakout candle low
+
+OR
+
+- Below the consolidation range
+
+Use whichever is further.
+
+----------------------------------------------------
+
+Short Trade
+
+Place stop loss:
+
+- Above breakout candle high
+
+OR
+
+- Above consolidation range
+
+Use whichever is further.
+
+====================================================
+POSITION SIZE
+====================================================
+
+Risk per trade:
+
+1%
+
+Maximum:
+
+2%
+
+Adjust position size based on stop-loss distance.
+
+====================================================
+TAKE PROFIT
+====================================================
+
+Method 1
+
+Risk Reward:
+
+1 : 2
+
+Example:
+
+Risk = 25 pips
+
+Target = 50 pips
+
+----------------------------------------------------
+
+Method 2
+
+Measure the height of the consolidation range.
+
+Project that distance from the breakout point.
+
+Example:
+
+Range Height = 40 pips
+
+Breakout occurs at 1.1000
+
+Target = 1.1040
+
+====================================================
+TRADE MANAGEMENT
+====================================================
+
+At +1R:
+
+Move stop loss to break even.
+
+At +2R:
+
+Optionally close 50% of the position.
+
+Trail the remaining position below higher lows
+(for long trades) or above lower highs
+(for short trades).
+
+====================================================
+FALSE BREAKOUT FILTER
+====================================================
+
+Avoid entering if:
+
+- Candle closes back inside the range.
+- Long upper or lower wick shows rejection.
+- Breakout occurs with a very small candle.
+- Price immediately reverses after breaking out.
+
+Wait for a clean close outside the range.
+
+====================================================
+OPTIONAL RETEST ENTRY
+====================================================
+
+Instead of entering immediately:
+
+Wait for price to return and retest the breakout level.
+
+Enter only if:
+
+- The level holds as support (long)
+OR
+- The level holds as resistance (short)
+
+This reduces false breakouts.
+
+====================================================
+RISK MANAGEMENT
+====================================================
+
+Maximum daily loss:
+
+3%
+
+Maximum weekly loss:
+
+6%
+
+Stop trading after:
+
+3 consecutive losing trades.
+
+Never increase risk to recover losses.
+
+====================================================
+VALID BREAKOUT PATTERNS
+====================================================
+
+Trade:
+
+- Rectangle Breakout
+- Horizontal Range Breakout
+- Bull Flag Breakout
+- Bear Flag Breakout
+- Ascending Triangle Breakout
+- Descending Triangle Breakout
+
+Avoid:
+
+- Random spikes
+- Low-liquidity breakouts
+- Breakouts during major news releases
+
+====================================================
+LONG TRADE EXAMPLE
+====================================================
+
+Currency Pair:
+
+EUR/USD
+
+Price consolidates between:
+
+1.1050
+
+and
+
+1.1080
+
+After 10 candles,
+a strong bullish candle closes above 1.1080.
+
+Entry:
+
+Buy at close.
+
+Stop:
+
+Below consolidation low.
+
+Target:
+
+Height of range projected upward
+or 2R.
+
+====================================================
+SHORT TRADE EXAMPLE
+====================================================
+
+Currency Pair:
+
+GBP/USD
+
+Price consolidates for several hours.
+
+Strong bearish candle closes below support.
+
+Entry:
+
+Sell at close.
+
+Stop:
+
+Above consolidation high.
+
+Target:
+
+Twice the risk
+or projected range height.
+
+====================================================
+RULES SUMMARY
+====================================================
+
+✓ Trade only confirmed breakouts.
+
+✓ Wait for candle close outside the range.
+
+✓ Risk only 1% per trade.
+
+✓ Use a protective stop loss.
+
+✓ Target at least 2:1 Reward/Risk.
+
+✓ Avoid trading during major news.
+
+✓ Prefer London and New York sessions.
+
+✓ Ignore weak or false breakouts.
+
+✓ Journal every trade.
+
+====================================================
+END OF STRATEGY
+====================================================

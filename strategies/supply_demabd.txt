@@ -1,0 +1,251 @@
+====================================================
+SUPPLY & DEMAND FOREX TRADING STRATEGY
+Version: 1.0
+Style: Supply & Demand
+Market: Forex
+
+Recommended Currency Pairs:
+- EUR/USD
+- GBP/USD
+- USD/JPY
+- AUD/USD
+- NZD/USD
+- USD/CAD
+- EUR/JPY
+- GBP/JPY
+
+Timeframes:
+Trend: Daily
+Setup: 4H
+Entry: 1H
+
+====================================================
+OBJECTIVE
+====================================================
+
+Identify institutional buying and selling zones
+where price is likely to reverse.
+
+====================================================
+TOOLS
+====================================================
+
+Indicators:
+
+- 200 EMA
+- ATR (14)
+
+No oscillators required.
+
+====================================================
+STEP 1: IDENTIFY TREND
+====================================================
+
+Bullish:
+
+Price above 200 EMA.
+
+Bearish:
+
+Price below 200 EMA.
+
+Trade only with trend.
+
+====================================================
+STEP 2: IDENTIFY ZONES
+====================================================
+
+Demand Zone
+
+A strong bullish move starts from
+a small consolidation.
+
+Pattern:
+
+Base → Rally
+
+Supply Zone
+
+A strong bearish move starts from
+a small consolidation.
+
+Pattern:
+
+Base → Drop
+
+Requirements:
+
+- At least 3 strong candles leave the base.
+- Large candle bodies.
+- Small consolidation area.
+
+====================================================
+STEP 3: WAIT FOR RETEST
+====================================================
+
+Never enter during the initial move.
+
+Wait until price revisits
+the supply or demand zone.
+
+====================================================
+LONG ENTRY
+====================================================
+
+Conditions:
+
+1. Uptrend.
+2. Price reaches demand zone.
+3. Bullish rejection candle forms.
+
+Accepted candles:
+
+- Hammer
+- Bullish Engulfing
+- Bullish Pin Bar
+
+Entry:
+
+Buy at candle close.
+
+====================================================
+SHORT ENTRY
+====================================================
+
+Conditions:
+
+1. Downtrend.
+2. Price reaches supply zone.
+3. Bearish rejection candle forms.
+
+Accepted candles:
+
+- Shooting Star
+- Bearish Engulfing
+- Bearish Pin Bar
+
+Entry:
+
+Sell at candle close.
+
+====================================================
+STOP LOSS
+====================================================
+
+Long:
+
+Below demand zone.
+
+Short:
+
+Above supply zone.
+
+Add:
+
+5 pip buffer
+
+or
+
+1 × ATR
+
+====================================================
+TAKE PROFIT
+====================================================
+
+Method 1
+
+2R
+
+Method 2
+
+Next opposing zone.
+
+====================================================
+TRADE MANAGEMENT
+====================================================
+
++1R
+
+Move stop to break even.
+
++2R
+
+Close half.
+
+Allow remaining trade
+to reach next zone.
+
+====================================================
+VALID ZONES
+====================================================
+
+Trade only fresh zones.
+
+A fresh zone has:
+
+- Never been revisited.
+- Strong departure.
+- Clear imbalance.
+
+Avoid:
+
+- Multiple retests.
+- Weak departures.
+- Choppy bases.
+
+====================================================
+FILTERS
+====================================================
+
+Do not trade:
+
+- News events.
+- Weak zones.
+- Sideways markets.
+- Counter-trend setups.
+
+====================================================
+RISK MANAGEMENT
+====================================================
+
+Risk:
+
+1%
+
+Maximum:
+
+2%
+
+Maximum daily loss:
+
+3%
+
+Maximum weekly loss:
+
+6%
+
+Stop after:
+
+3 losing trades.
+
+====================================================
+RULES SUMMARY
+====================================================
+
+✓ Trade only fresh zones.
+
+✓ Wait for retest.
+
+✓ Confirm with price action.
+
+✓ Trade with trend.
+
+✓ Risk only 1%.
+
+✓ Minimum 2:1 Reward/Risk.
+
+✓ Never average into losing trades.
+
+====================================================
+END OF STRATEGY
+====================================================
