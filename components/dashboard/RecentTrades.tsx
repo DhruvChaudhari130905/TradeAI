@@ -42,9 +42,9 @@ export function RecentTrades({ trades }: RecentTradesProps) {
                 <Link
                   key={trade.id}
                   href={`/journal/${trade.id}`}
-                  className="flex items-center gap-3 rounded-lg border border-zinc-800/50 bg-[#0A0B0E] px-3 py-2.5 transition-colors hover:border-zinc-700"
+                  className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-800/50 bg-[#0A0B0E] px-3 py-2.5 transition-colors hover:border-zinc-700 sm:flex-nowrap sm:gap-3"
                 >
-                  <span className="w-20 font-mono text-xs font-semibold text-white">
+                  <span className="min-w-0 flex-1 font-mono text-xs font-semibold text-white sm:w-20 sm:flex-none">
                     {trade.pair}
                   </span>
                   <Badge

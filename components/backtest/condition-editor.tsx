@@ -97,13 +97,13 @@ export function ConditionEditor({ condition, indicators, onChange, onRemove }: C
   const needsPattern = condition.type === 'candle_pattern'
 
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-[#0A0B0E] px-3 py-2">
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-800 bg-[#0A0B0E] px-3 py-2">
       {/* Condition type */}
       <Select
         value={condition.type}
         onValueChange={(v) => onChange({ ...condition, type: v as ConditionType })}
       >
-        <SelectTrigger className="h-8 w-36 border-zinc-700 bg-transparent text-xs text-white">
+        <SelectTrigger className="h-8 w-full border-zinc-700 bg-transparent text-xs text-white sm:w-36">
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="border-zinc-800 bg-[#12141A] max-h-64 overflow-y-auto">
@@ -207,7 +207,7 @@ export function ConditionEditor({ condition, indicators, onChange, onRemove }: C
       <Button
         variant="ghost"
         size="sm"
-        className="ml-auto h-7 w-7 p-0 text-zinc-500 hover:text-[#FF4D4D]"
+        className="ml-auto h-7 w-7 p-0 text-zinc-500 hover:text-[#FF4D4D] sm:ml-auto"
         onClick={onRemove}
       >
         <Trash2 className="h-3.5 w-3.5" />

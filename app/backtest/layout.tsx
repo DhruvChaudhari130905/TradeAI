@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { Sidebar } from "@/components/layout/Sidebar";
-import { Navbar } from "@/components/layout/Navbar";
+import { AppShell } from "@/components/layout/AppShell";
 
 export default async function BacktestLayout({
   children,
@@ -24,15 +23,8 @@ export default async function BacktestLayout({
     .single();
 
   return (
-    <div className="flex h-screen bg-[#0A0B0E]">
-      <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Navbar
-          username={profile?.username ?? null}
-          email={user.email ?? null}
-        />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
-      </div>
-    </div>
+    <AppShell username={profile?.username ?? null} email={user.email ?? null}>
+      {children}
+    </AppShell>
   );
 }

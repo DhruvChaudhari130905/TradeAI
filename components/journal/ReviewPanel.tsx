@@ -145,7 +145,7 @@ export function ReviewPanel({ tradeId, existingReview }: ReviewPanelProps) {
       <div className="border-t border-zinc-800" />
 
       {/* All 5 personalities side by side */}
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {PERSONALITY_KEYS.map((key) => {
           const r = review[key]
           return r ? (

@@ -34,7 +34,7 @@ export default function BacktestHistoryPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">
             Backtest History
@@ -88,12 +88,12 @@ export default function BacktestHistoryPage() {
                   : (run.status === 'extracted' || run.status === 'approved') ? `/backtest/${run.id}/review`
                   : '#'
                 }
-                className={`flex items-center gap-4 rounded-lg border border-zinc-800 bg-[#12141A] px-4 py-3 transition-colors hover:border-zinc-700 ${
+                className={`flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800 bg-[#12141A] px-4 py-3 transition-colors hover:border-zinc-700 sm:flex-nowrap sm:gap-4 ${
                   (run.status === 'extracting' || run.status === 'running' || run.status === 'error') ? 'cursor-default' : ''
                 }`}
               >
                 {/* Name */}
-                <span className="w-48 truncate text-sm font-semibold text-white">
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-white sm:w-48 sm:flex-none">
                   {run.strategy_name || 'Untitled'}
                 </span>
 
@@ -103,12 +103,12 @@ export default function BacktestHistoryPage() {
                 </Badge>
 
                 {/* Market */}
-                <Badge variant="outline" className="text-xs text-zinc-500 border-zinc-800">
+                <Badge variant="outline" className="hidden text-xs text-zinc-500 border-zinc-800 sm:inline-flex">
                   {run.market === 'forex' ? 'FX' : 'CRYPTO'}
                 </Badge>
 
                 {/* Date range */}
-                <span className="text-xs text-zinc-500">
+                <span className="hidden text-xs text-zinc-500 md:inline">
                   {run.date_from} → {run.date_to}
                 </span>
 
@@ -122,13 +122,13 @@ export default function BacktestHistoryPage() {
                 )}
 
                 {run.status === 'complete' && winRate != null && (
-                  <span className="font-mono text-xs text-zinc-400">
+                  <span className="hidden font-mono text-xs text-zinc-400 sm:inline">
                     {winRate.toFixed(1)}% WR
                   </span>
                 )}
 
                 {run.status === 'complete' && totalTrades != null && (
-                  <span className="font-mono text-xs text-zinc-500">
+                  <span className="hidden font-mono text-xs text-zinc-500 lg:inline">
                     {totalTrades} trades
                   </span>
                 )}
@@ -166,7 +166,7 @@ export default function BacktestHistoryPage() {
                 )}
 
                 {/* Created date */}
-                <span className="ml-auto text-xs text-zinc-600">
+                <span className="hidden ml-auto text-xs text-zinc-600 sm:inline">
                   {new Date(run.created_at).toLocaleDateString('en-US', {
                     month: 'short',
                     day: 'numeric',

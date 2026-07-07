@@ -16,6 +16,14 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+To test from your phone or another device on the same Wi-Fi, open:
+
+```bash
+http://YOUR_COMPUTER_IP:3000
+```
+
+For example, if your computer's local IP is `192.168.1.23`, open `http://192.168.1.23:3000` on your phone. The dev server binds to `0.0.0.0` so devices on the same network can reach it.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

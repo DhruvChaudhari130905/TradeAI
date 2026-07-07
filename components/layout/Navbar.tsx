@@ -1,19 +1,30 @@
 "use client";
 
-import { User } from "lucide-react";
+import { Menu, User } from "lucide-react";
 import { signOut } from "@/lib/actions/auth";
+import { Button } from "@/components/ui/button";
 
 interface NavbarProps {
   username: string | null;
   email: string | null;
+  onMenuClick?: () => void;
 }
 
-export function Navbar({ username, email }: NavbarProps) {
+export function Navbar({ username, email, onMenuClick }: NavbarProps) {
   return (
-    <header className="flex h-14 items-center justify-between border-b border-zinc-800 bg-[#0A0B0E] px-6">
-      <div />
+    <header className="flex h-14 items-center justify-between border-b border-zinc-800 bg-[#0A0B0E] px-4 sm:px-6">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        onClick={onMenuClick}
+        className="lg:hidden text-zinc-400 hover:bg-[#12141A] hover:text-white"
+        aria-label="Open navigation"
+      >
+        <Menu className="h-5 w-5" />
+      </Button>
 
-      <div className="flex items-center gap-4">
+      <div className="ml-auto flex items-center gap-4">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#12141A]">
             <User className="h-4 w-4 text-zinc-400" />

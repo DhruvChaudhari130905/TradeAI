@@ -24,9 +24,38 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
-export function Sidebar() {
+interface NavLinksProps {
+  onNavigate?: () => void;
+}
+
+export function NavLinks({ onNavigate }: NavLinksProps) {
   const pathname = usePathname();
 
+  return (
+    <>
+      {NAV_ITEMS.map((item) => {
+        const isActive = pathname.startsWith(item.href);
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            onClick={onNavigate}
+            className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              isActive
+                ? "bg-[#12141A] text-[#00FF9C]"
+                : "text-zinc-400 hover:bg-[#12141A] hover:text-white"
+            }`}
+          >
+            <item.icon className="h-4 w-4" />
+            {item.label}
+          </Link>
+        );
+      })}
+    </>
+  );
+}
+
+export function Sidebar() {
   return (
     <aside className="flex h-screen w-56 flex-col border-r border-zinc-800 bg-[#0A0B0E]">
       {/* Logo */}
@@ -39,23 +68,7 @@ export function Sidebar() {
 
       {/* Nav links */}
       <nav className="flex-1 space-y-1 px-3 py-4">
-        {NAV_ITEMS.map((item) => {
-          const isActive = pathname.startsWith(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                isActive
-                  ? "bg-[#12141A] text-[#00FF9C]"
-                  : "text-zinc-400 hover:bg-[#12141A] hover:text-white"
-              }`}
-            >
-              <item.icon className="h-4 w-4" />
-              {item.label}
-            </Link>
-          );
-        })}
+        <NavLinks />
       </nav>
     </aside>
   );

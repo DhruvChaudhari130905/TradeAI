@@ -254,7 +254,7 @@ export default function BacktestReportPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Link href="/backtest" className="text-sm text-zinc-500 transition-colors hover:text-white">
           ← Backtest
         </Link>
@@ -284,7 +284,7 @@ export default function BacktestReportPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard
           icon={<Percent className="h-4 w-4" />}
           label="Win Rate"
@@ -350,13 +350,13 @@ export default function BacktestReportPage() {
       )}
 
       {/* Charts row: Equity + Drawdown */}
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card className="border-zinc-800 bg-[#12141A]">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold text-zinc-400">Equity Curve</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-64">
+            <div className="h-64" style={{ minHeight: 256 }}>
               <EquityCurveChart data={result.equity_curve} startingCapital={run.starting_capital} />
             </div>
           </CardContent>
@@ -367,7 +367,7 @@ export default function BacktestReportPage() {
             <CardTitle className="text-sm font-semibold text-zinc-400">Drawdown</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-64">
+            <div className="h-64" style={{ minHeight: 256 }}>
               <DrawdownChart data={result.drawdown_curve} />
             </div>
           </CardContent>
@@ -381,7 +381,7 @@ export default function BacktestReportPage() {
             <CardTitle className="text-sm font-semibold text-zinc-400">Monthly Returns</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-56">
+            <div className="h-56" style={{ minHeight: 224 }}>
               <MonthlyReturnsChart data={result.monthly_returns} />
             </div>
           </CardContent>
@@ -398,7 +398,7 @@ export default function BacktestReportPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
               {reviews.map((review) => (
                 <PersonalityReviewCard key={review.personality} review={review} />
               ))}
@@ -431,8 +431,8 @@ export default function BacktestReportPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="max-h-96 overflow-y-auto">
-            <table className="w-full text-sm">
+          <div className="max-h-96 overflow-x-auto overflow-y-auto">
+            <table className="min-w-[760px] w-full text-sm">
               <thead>
                 <tr className="border-b border-zinc-800 text-left">
                   <th className="pb-2 text-xs font-medium text-zinc-500">#</th>

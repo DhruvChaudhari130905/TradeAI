@@ -245,9 +245,9 @@ export default function DashboardPage() {
 
         {/* Refresh + Period Filter */}
         {!isEmpty && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Time period pills */}
-            <div className="flex items-center gap-1 rounded-lg border border-zinc-800 bg-[#12141A] p-1">
+            <div className="flex flex-wrap items-center gap-1 rounded-lg border border-zinc-800 bg-[#12141A] p-1">
               <CalendarDays className="ml-2 h-3.5 w-3.5 text-zinc-500" />
               {periods.map((p) => (
                 <button
@@ -291,7 +291,7 @@ export default function DashboardPage() {
             Start by logging a trade or running a backtest. Your performance
             charts, AI insights, and analytics will appear here automatically.
           </p>
-          <div className="mt-6 flex gap-3">
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/journal/new">
               <Button className="gap-2 bg-[#00FF9C] text-[#0A0B0E] hover:bg-[#00FF9C]/90">
                 <BookOpen className="h-4 w-4" />

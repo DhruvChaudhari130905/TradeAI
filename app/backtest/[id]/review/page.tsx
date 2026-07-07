@@ -262,15 +262,15 @@ export default function BacktestReviewPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-3">
           <Link href="/backtest" className="text-sm text-zinc-500 hover:text-white transition-colors">← Backtest</Link>
           <span className="text-zinc-700">|</span>
           <h1 className="text-2xl font-bold tracking-tight text-white">Review Strategy Rules</h1>
           <Badge variant="outline" className="border-zinc-700 text-zinc-400">{run.pair}</Badge>
           <Badge variant="outline" className="font-mono text-zinc-500">{run.timeframe}</Badge>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Button
             variant="outline"
             className="gap-2 border-zinc-800 text-zinc-400 hover:text-white"
@@ -291,9 +291,9 @@ export default function BacktestReviewPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Left: Rule builder (2 cols) */}
-        <div className="col-span-2">
+        <div className="lg:col-span-2">
           {rules && <RuleBuilder rules={rules} onChange={setRules} />}
         </div>
 

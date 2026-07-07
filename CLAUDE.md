@@ -125,7 +125,7 @@ Every table has RLS enabled. Policies use `auth.uid()` — users can only read/w
 - Accents: `#00FF9C` (electric green for gains/positive), `#FF4D4D` (red for losses/warnings)
 - `font-mono` for numbers and scores; clean sans-serif for body
 - Dense, information-rich layouts — traders want data, not whitespace
-- Desktop-first (1280px+). Mobile-responsive is nice-to-have.
+- Mobile-responsive is a first-class target. Use `lg` (1024px) as the desktop breakpoint; phone and tablet layouts must remain readable and operable without horizontal page scroll.
 
 ## Env Variables (`.env.local`)
 

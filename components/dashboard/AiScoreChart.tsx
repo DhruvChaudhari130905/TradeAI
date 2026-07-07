@@ -58,7 +58,8 @@ export function AiScoreChart({ trades }: AiScoreChartProps) {
             avg {avgScore.toFixed(1)}/10
           </span>
         </div>
-        <ResponsiveContainer width="100%" height={240}>
+        <div style={{ height: 240, minHeight: 240 }}>
+          <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
             <XAxis
@@ -101,6 +102,7 @@ export function AiScoreChart({ trades }: AiScoreChartProps) {
             />
           </LineChart>
         </ResponsiveContainer>
+        </div>
       </CardContent>
     </Card>
   )

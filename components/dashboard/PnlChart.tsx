@@ -62,7 +62,8 @@ export function PnlChart({ trades }: PnlChartProps) {
             ${finalPnl.toFixed(2)}
           </span>
         </div>
-        <ResponsiveContainer width="100%" height={240}>
+        <div style={{ height: 240, minHeight: 240 }}>
+          <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
             <defs>
               <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -104,6 +105,7 @@ export function PnlChart({ trades }: PnlChartProps) {
             />
           </AreaChart>
         </ResponsiveContainer>
+        </div>
       </CardContent>
     </Card>
   )

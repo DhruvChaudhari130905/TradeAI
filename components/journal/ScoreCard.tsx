@@ -61,7 +61,7 @@ export function ScoreCard({ personalityKey, review, compact = false }: ScoreCard
         </div>
 
         {/* Radar chart */}
-        <div className="h-32">
+        <div style={{ height: 128, minHeight: 128 }}>
           <ResponsiveContainer width="100%" height="100%">
             <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="65%">
               <PolarGrid stroke="#1C1E26" strokeDasharray="3 3" />
@@ -168,7 +168,7 @@ export function ScoreCard({ personalityKey, review, compact = false }: ScoreCard
       </div>
 
       {/* Radar chart */}
-      <div className="h-52">
+      <div style={{ height: 208, minHeight: 208 }}>
         <ResponsiveContainer width="100%" height="100%">
           <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="70%">
             <PolarGrid stroke="#1C1E26" strokeDasharray="3 3" />

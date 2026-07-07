@@ -53,7 +53,8 @@ export function WinLossChart({ trades }: WinLossChartProps) {
       <CardContent className="p-6">
         <h3 className="mb-4 text-sm font-semibold text-white">Win / Loss</h3>
         <div className="flex items-center gap-6">
-          <ResponsiveContainer width="60%" height={200}>
+          <div style={{ width: '60%', height: 200, minHeight: 200 }}>
+            <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
                 data={data}
@@ -88,6 +89,7 @@ export function WinLossChart({ trades }: WinLossChartProps) {
               />
             </PieChart>
           </ResponsiveContainer>
+          </div>
           {/* Legend */}
           <div className="flex flex-col gap-3">
             {data.map((entry) => (

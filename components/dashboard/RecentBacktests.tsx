@@ -44,19 +44,19 @@ export function RecentBacktests({ backtests }: RecentBacktestsProps) {
                 <Link
                   key={run.id}
                   href={`/backtest/${run.id}`}
-                  className="flex items-center gap-3 rounded-lg border border-zinc-800/50 bg-[#0A0B0E] px-3 py-2.5 transition-colors hover:border-zinc-700"
+                  className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-800/50 bg-[#0A0B0E] px-3 py-2.5 transition-colors hover:border-zinc-700 sm:flex-nowrap sm:gap-3"
                 >
-                  <span className="w-32 truncate text-xs font-semibold text-white">
+                  <span className="min-w-0 flex-1 truncate text-xs font-semibold text-white sm:w-32 sm:flex-none">
                     {run.strategy_name || 'Untitled'}
                   </span>
                   <Badge
                     variant="outline"
-                    className="font-mono text-[10px] text-zinc-400 border-zinc-700"
+                    className="hidden font-mono text-[10px] text-zinc-400 border-zinc-700 sm:inline-flex"
                   >
                     {run.pair} · {run.timeframe}
                   </Badge>
                   {winRate != null && (
-                    <span className="ml-auto font-mono text-xs text-zinc-400">
+                    <span className="hidden font-mono text-xs text-zinc-400 sm:ml-auto sm:inline">
                       {winRate.toFixed(1)}% WR
                     </span>
                   )}

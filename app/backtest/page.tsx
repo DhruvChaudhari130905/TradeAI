@@ -245,7 +245,7 @@ export default function BacktestPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">
             AI Backtest
@@ -256,7 +256,7 @@ export default function BacktestPage() {
               : 'Define strategy rules manually and run a backtest.'}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {/* Mode toggle */}
           <div className="flex rounded-lg border border-zinc-800 bg-[#12141A] p-0.5">
             <button
@@ -290,9 +290,9 @@ export default function BacktestPage() {
       {mode === 'upload' ? (
         /* ── Upload mode ────────────────────────────────────────────────── */
         <form onSubmit={handleUploadSubmit}>
-          <div className="grid grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             {/* Left column — Strategy Upload */}
-            <div className="col-span-2 space-y-6">
+            <div className="space-y-6 lg:col-span-2">
               <Card className="border-zinc-800 bg-[#12141A]">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold text-zinc-400">Strategy Document</CardTitle>
@@ -310,7 +310,7 @@ export default function BacktestPage() {
 
                   <div>
                     <Label className="text-xs text-zinc-500">Upload Document (.txt or .pdf, max 5MB)</Label>
-                    <div className="mt-1.5 flex items-center gap-3">
+                    <div className="mt-1.5 flex flex-wrap items-center gap-3">
                       <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-zinc-700 bg-[#0A0B0E] px-4 py-3 text-sm text-zinc-400 transition-colors hover:border-[#00FF9C]/30 hover:text-white">
                         <Upload className="h-4 w-4" />
                         {docFile ? docFile.name : 'Choose file'}
@@ -375,7 +375,7 @@ export default function BacktestPage() {
         <form onSubmit={handleManualSubmit}>
           <div className="space-y-6">
             {/* Parameters row */}
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <Label className="text-xs text-zinc-500">Strategy Name</Label>
                 <Input
@@ -429,7 +429,7 @@ export default function BacktestPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <Label className="text-xs text-zinc-500">From</Label>
                 <Input
@@ -483,8 +483,8 @@ export default function BacktestPage() {
             </div>
 
             {/* Rules + Execution Config */}
-            <div className="grid grid-cols-3 gap-6">
-              <div className="col-span-2">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+              <div className="lg:col-span-2">
                 <RuleBuilder rules={rules} onChange={setRules} />
               </div>
               <div>

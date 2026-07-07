@@ -185,9 +185,9 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
             Trade Details
           </CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-4 gap-4">
+        <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {/* Pair */}
-          <div className="col-span-2 space-y-2">
+          <div className="space-y-2 sm:col-span-2">
             <Label className="text-zinc-400">Pair</Label>
             <Select value={watchPair} onValueChange={(v) => v && onPairChange(v)}>
               <SelectTrigger className="border-zinc-800 bg-[#0A0B0E] text-white">
@@ -296,7 +296,7 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
           </div>
 
           {/* Entry Time */}
-          <div className="col-span-3 space-y-2">
+          <div className="space-y-2 sm:col-span-2 lg:col-span-3">
             <Label className="text-zinc-400">Entry Time</Label>
             <Input
               type="datetime-local"
@@ -314,7 +314,7 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
             Prices
           </CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-6 gap-4">
+        <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           <div className="space-y-2">
             <Label className="text-zinc-400">Entry Price</Label>
             <Input
@@ -397,7 +397,7 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
             Outcome
           </CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-4 gap-4">
+        <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-2">
             <Label className="text-zinc-400">Result</Label>
             <Select
@@ -508,7 +508,7 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
 
             {/* Screenshot previews */}
             {screenshots.length > 0 && (
-              <div className="mt-3 grid grid-cols-4 gap-3">
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {screenshots.map((url) => (
                   <div
                     key={url}

@@ -78,7 +78,7 @@ export default function JournalPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">
             Trade Journal
@@ -96,7 +96,7 @@ export default function JournalPage() {
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Card className="border-zinc-800 bg-[#12141A]">
           <CardContent className="flex items-center gap-3 p-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#00FF9C]/10">
@@ -150,8 +150,8 @@ export default function JournalPage() {
       </div>
 
       {/* Filter Bar */}
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="w-36">
+      <div className="grid grid-cols-2 items-end gap-3 sm:grid-cols-3 lg:flex lg:flex-wrap">
+        <div className="w-full lg:w-36">
           <Select value={market} onValueChange={(v) => setMarket(v ?? '')}>
             <SelectTrigger className="h-9 border-zinc-800 bg-[#12141A] text-sm text-white">
               <SelectValue placeholder="Market" />
@@ -163,7 +163,7 @@ export default function JournalPage() {
             </SelectContent>
           </Select>
         </div>
-        <div className="w-36">
+        <div className="w-full lg:w-36">
           <Select value={outcome} onValueChange={(v) => setOutcome(v ?? '')}>
             <SelectTrigger className="h-9 border-zinc-800 bg-[#12141A] text-sm text-white">
               <SelectValue placeholder="Outcome" />
@@ -177,7 +177,7 @@ export default function JournalPage() {
             </SelectContent>
           </Select>
         </div>
-        <div className="w-36">
+        <div className="w-full lg:w-36">
           <Select value={direction} onValueChange={(v) => setDirection(v ?? '')}>
             <SelectTrigger className="h-9 border-zinc-800 bg-[#12141A] text-sm text-white">
               <SelectValue placeholder="Direction" />
@@ -189,7 +189,7 @@ export default function JournalPage() {
             </SelectContent>
           </Select>
         </div>
-        <div className="w-44">
+        <div className="w-full lg:w-44">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
             <Input
@@ -204,20 +204,20 @@ export default function JournalPage() {
           type="date"
           value={dateFrom}
           onChange={(e) => setDateFrom(e.target.value)}
-          className="h-9 w-32 border-zinc-800 bg-[#12141A] text-sm text-white"
+          className="h-9 w-full border-zinc-800 bg-[#12141A] text-sm text-white lg:w-32"
         />
         <Input
           type="date"
           value={dateTo}
           onChange={(e) => setDateTo(e.target.value)}
-          className="h-9 w-32 border-zinc-800 bg-[#12141A] text-sm text-white"
+          className="h-9 w-full border-zinc-800 bg-[#12141A] text-sm text-white lg:w-32"
         />
         {hasFilters && (
           <Button
             variant="ghost"
             size="sm"
             onClick={clearFilters}
-            className="h-9 text-xs text-zinc-400 hover:text-white"
+            className="h-9 text-xs text-zinc-400 hover:text-white sm:w-fit"
           >
             Clear filters
           </Button>
@@ -254,10 +254,10 @@ export default function JournalPage() {
               <Link
                 key={trade.id}
                 href={`/journal/${trade.id}`}
-                className="flex items-center gap-4 rounded-lg border border-zinc-800 bg-[#12141A] px-4 py-3 transition-colors hover:border-zinc-700"
+                className="flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800 bg-[#12141A] px-4 py-3 transition-colors hover:border-zinc-700 sm:flex-nowrap sm:gap-4"
               >
                 {/* Pair */}
-                <span className="w-24 font-mono text-sm font-semibold text-white">
+                <span className="min-w-0 flex-1 font-mono text-sm font-semibold text-white sm:w-24 sm:flex-none">
                   {trade.pair}
                 </span>
 
@@ -292,7 +292,7 @@ export default function JournalPage() {
                 </Badge>
 
                 {/* Entry time */}
-                <span className="w-36 text-sm text-zinc-400">
+                <span className="hidden w-36 text-sm text-zinc-400 sm:inline">
                   {trade.entry_time
                     ? new Date(trade.entry_time).toLocaleDateString('en-US', {
                         month: 'short',
@@ -305,7 +305,7 @@ export default function JournalPage() {
 
                 {/* PnL */}
                 <span
-                  className={`w-24 font-mono text-sm font-semibold ${
+                  className={`font-mono text-sm font-semibold sm:w-24 ${
                     pnl > 0 ? 'text-[#00FF9C]' : pnl < 0 ? 'text-[#FF4D4D]' : 'text-zinc-500'
                   }`}
                 >
@@ -313,7 +313,7 @@ export default function JournalPage() {
                 </span>
 
                 {/* R:R */}
-                <span className="w-16 font-mono text-sm text-zinc-400">
+                <span className="hidden w-16 font-mono text-sm text-zinc-400 sm:inline">
                   {trade.risk_reward_ratio ? `1:${Number(trade.risk_reward_ratio).toFixed(1)}` : '—'}
                 </span>
 

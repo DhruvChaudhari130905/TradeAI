@@ -74,8 +74,8 @@ export function TradeDetailClient({ trade }: TradeDetailClientProps) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-3">
           <Link
             href="/journal"
             className="text-sm text-zinc-500 transition-colors hover:text-white"
@@ -110,7 +110,7 @@ export function TradeDetailClient({ trade }: TradeDetailClientProps) {
             </Badge>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 sm:ml-auto">
           <Link href={`/journal/${trade.id}/edit`}>
             <Button variant="outline" size="sm" className="gap-1.5 border-zinc-800 text-zinc-400 hover:text-white">
               <Pencil className="h-3.5 w-3.5" />
@@ -148,14 +148,14 @@ export function TradeDetailClient({ trade }: TradeDetailClientProps) {
       </div>
 
       {/* Trade Data — top section, full width two-column grid */}
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Prices Card */}
         <Card className="border-zinc-800 bg-[#12141A]">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold text-zinc-400">Prices & Levels</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               <Field label="Entry Price" value={formatNum(trade.entry_price)} mono />
               <Field label="Exit Price" value={formatNum(trade.exit_price)} mono />
               <Field
@@ -253,7 +253,7 @@ export function TradeDetailClient({ trade }: TradeDetailClientProps) {
             <CardTitle className="text-sm font-semibold text-zinc-400">Screenshots</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {trade.screenshot_urls.map((url) => (
                 <button
                   key={url}
@@ -282,7 +282,7 @@ export function TradeDetailClient({ trade }: TradeDetailClientProps) {
       {/* Expanded screenshot overlay */}
       {expandedImg && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-8"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 sm:p-8"
           onClick={() => setExpandedImg(null)}
         >
           <button
