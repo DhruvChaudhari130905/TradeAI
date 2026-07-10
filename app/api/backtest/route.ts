@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service-client'
 import { extractStrategyRules } from '@/lib/nim/extract-strategy-rules'
-import { PDFParse } from 'pdf-parse'
+import PDFParse from 'pdf-parse-fork'
 
 export async function POST(request: Request) {
   try {
@@ -179,10 +179,8 @@ async function processExtraction(
       try {
         const arrayBuffer = await docData.arrayBuffer()
         const buffer = Buffer.from(arrayBuffer)
-        const pdfParser = new PDFParse({ data: buffer })
-        const pdfData = await pdfParser.getText()
+        const pdfData = await PDFParse(buffer)
         docText = pdfData.text
-        await pdfParser.destroy()
 
         if (!docText || docText.trim().length < 10) {
           await markError('Failed to extract text from PDF. The document may be scanned or contain no readable text.')
