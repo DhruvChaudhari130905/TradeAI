@@ -73,7 +73,11 @@ export async function POST(request: Request) {
 
     // Call all 5 personalities in parallel (with one retry on failure)
     const results = await Promise.all(
-      personalities.map(async ({ key, prompt }) => {
+      personalities.map(async ({ key, prompt }, index) => {
+        // Stagger requests slightly to avoid rate limits
+        if (index > 0) {
+          await new Promise((resolve) => setTimeout(resolve, index * 200))
+        }
         const systemPrompt = buildReviewSystemPrompt(prompt)
         try {
           return { key, review: await callNim(systemPrompt, tradeContext) }

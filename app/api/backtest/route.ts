@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service-client'
 import { extractStrategyRules } from '@/lib/nim/extract-strategy-rules'
 import PDFParse from 'pdf-parse-fork'
+import { waitUntil } from '@vercel/functions'
 
 export async function POST(request: Request) {
   try {
@@ -105,20 +106,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to create backtest run' }, { status: 500 })
     }
 
-    // Process extraction in background
-    processExtraction(run.id, {
-      userId,
-      strategyDocUrl,
-      strategyName: strategyName || 'Untitled Strategy',
-      market,
-      pair,
-      timeframe,
-      dateFrom,
-      dateTo,
-      startingCapital: capital,
-    }).catch((err) => {
-      console.error('[api/backtest] background extraction failed:', err)
-    })
+    // Process extraction in background using waitUntil for proper Vercel background execution
+    waitUntil(
+      processExtraction(run.id, {
+        userId,
+        strategyDocUrl,
+        strategyName: strategyName || 'Untitled Strategy',
+        market,
+        pair,
+        timeframe,
+        dateFrom,
+        dateTo,
+        startingCapital: capital,
+      }).catch((err) => {
+        console.error('[api/backtest] background extraction failed:', err)
+      })
+    )
 
     // Return the run ID immediately — client will redirect to review page
     return NextResponse.json({ backtestId: run.id }, { status: 202 })

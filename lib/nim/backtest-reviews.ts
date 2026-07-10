@@ -6,6 +6,10 @@ import type { StrategyRuleSet, BacktestResult, BacktestPersonalityReview, BoolEx
 
 const INTER_PERSONALITY_DELAY_MS = 500
 
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 /**
  * Generate 5 personality reviews for a backtest by calling NIM in parallel.
  * Each personality evaluates the strategy + results through their unique lens.
@@ -17,17 +21,21 @@ export async function generateBacktestReviews(
 ): Promise<BacktestPersonalityReview[]> {
   const dataPayload = buildReviewPayload(rules, result, params)
 
-  // Call all 5 personalities in parallel
-  const reviewPromises = BACKTEST_PERSONALITY_PROMPTS.map((personality) =>
-    callPersonalityNIM(personality.prompt, personality.name, dataPayload)
-      .catch(() => null)
-  )
+  // Call all 5 personalities sequentially with delays to avoid rate limiting
+  const reviews: BacktestPersonalityReview[] = []
 
-  const results = await Promise.all(reviewPromises)
+  for (const personality of BACKTEST_PERSONALITY_PROMPTS) {
+    try {
+      const review = await callPersonalityNIM(personality.prompt, personality.name, dataPayload)
+      reviews.push(review)
+    } catch (err) {
+      console.error(`[backtest-reviews] ${personality.name} failed:`, err)
+    }
+    // Small delay between calls to avoid NIM rate limiting
+    await sleep(INTER_PERSONALITY_DELAY_MS)
+  }
 
-  // Map results to BacktestPersonalityReview, filtering out failures
-  return results
-    .filter((r): r is BacktestPersonalityReview => r !== null)
+  return reviews
 }
 
 // ── Internal helpers ──────────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import { runBacktestEngine } from '@/lib/backtest/engine'
 import { generateBacktestReport } from '@/lib/nim/run-backtest'
 import { generateBacktestReviews } from '@/lib/nim/backtest-reviews'
 import type { StrategyRuleSet, ExecutionConfig, BacktestTimeframe } from '@/lib/types/backtest'
+import { waitUntil } from '@vercel/functions'
 
 export async function POST(
   request: Request,
@@ -73,20 +74,22 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to update backtest status' }, { status: 500 })
     }
 
-    // Process in background
-    processBacktestExecution(runId, {
-      userId: user.id,
-      approvedRules,
-      executionConfig,
-      pair: run.pair,
-      market: run.market,
-      timeframe: run.timeframe as BacktestTimeframe,
-      dateFrom: run.date_from,
-      dateTo: run.date_to,
-      startingCapital: run.starting_capital,
-    }).catch((err) => {
-      console.error('[api/backtest/[id]] background execution failed:', err)
-    })
+    // Process in background using waitUntil for proper Vercel background execution
+    waitUntil(
+      processBacktestExecution(runId, {
+        userId: user.id,
+        approvedRules,
+        executionConfig,
+        pair: run.pair,
+        market: run.market,
+        timeframe: run.timeframe as BacktestTimeframe,
+        dateFrom: run.date_from,
+        dateTo: run.date_to,
+        startingCapital: run.starting_capital,
+      }).catch((err) => {
+        console.error('[api/backtest/[id]] background execution failed:', err)
+      })
+    )
 
     return NextResponse.json({ status: 'running' }, { status: 202 })
   } catch (error) {
@@ -113,6 +116,9 @@ async function processBacktestExecution(
   },
 ) {
   const supabase = createServiceClient()
+
+  // Small delay helper to avoid rate limits
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
   const markError = async (msg: string) => {
     await supabase
@@ -145,31 +151,34 @@ async function processBacktestExecution(
       pair: params.pair,
     })
 
-    // 3. Generate AI narrative report + 5 personality reviews (in parallel)
-    const [aiReport, personalityReviews] = await Promise.all([
-      generateBacktestReport(params.approvedRules, result, {
-        pair: params.pair,
-        timeframe: params.timeframe,
-        dateFrom: params.dateFrom ?? '',
-        dateTo: params.dateTo ?? '',
-        startingCapital: params.startingCapital,
-      }).catch((err) => {
-        console.error('[api/backtest/[id]] report generation failed:', err)
-        return '## Report Generation Failed\n\nThe AI narrative report could not be generated. Please review the performance statistics.'
-      }),
-      generateBacktestReviews(params.approvedRules, result, {
-        pair: params.pair,
-        timeframe: params.timeframe,
-        dateFrom: params.dateFrom ?? '',
-        dateTo: params.dateTo ?? '',
-        startingCapital: params.startingCapital,
-      }).catch((err) => {
-        console.error('[api/backtest/[id]] personality reviews failed:', err)
-        return []
-      }),
-    ])
+    // 3. Generate AI narrative report
+    const aiReport = await generateBacktestReport(params.approvedRules, result, {
+      pair: params.pair,
+      timeframe: params.timeframe,
+      dateFrom: params.dateFrom ?? '',
+      dateTo: params.dateTo ?? '',
+      startingCapital: params.startingCapital,
+    }).catch((err) => {
+      console.error('[api/backtest/[id]] report generation failed:', err)
+      return '## Report Generation Failed\n\nThe AI narrative report could not be generated. Please review the performance statistics.'
+    })
 
-    // 4. Store result
+    // Small delay to avoid NIM rate limiting between report and reviews
+    await sleep(500)
+
+    // 4. Generate 5 personality reviews (sequential with built-in delays)
+    const personalityReviews = await generateBacktestReviews(params.approvedRules, result, {
+      pair: params.pair,
+      timeframe: params.timeframe,
+      dateFrom: params.dateFrom ?? '',
+      dateTo: params.dateTo ?? '',
+      startingCapital: params.startingCapital,
+    }).catch((err) => {
+      console.error('[api/backtest/[id]] personality reviews failed:', err)
+      return []
+    })
+
+    // 5. Store result
     const { error: updateError } = await supabase
       .from('backtest_runs')
       .update({

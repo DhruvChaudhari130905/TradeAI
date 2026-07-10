@@ -22,6 +22,8 @@ const DEFAULT_EXECUTION: Partial<StrategyRuleSet> = {
 export async function extractStrategyRules(docText: string): Promise<StrategyRuleSet> {
   const client = getNimClient()
 
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
   // Attempt 1: Primary model
   try {
     return await callExtractor(client, docText, NIM_MODEL, false)
@@ -29,12 +31,18 @@ export async function extractStrategyRules(docText: string): Promise<StrategyRul
     console.error('[extractStrategyRules] primary model failed:', err)
   }
 
+  // Small delay before fallback
+  await sleep(500)
+
   // Attempt 2: Fallback model (larger, better instruction-following)
   try {
     return await callExtractor(client, docText, NIM_FALLBACK_MODEL, false)
   } catch (err) {
     console.error('[extractStrategyRules] fallback model failed:', err)
   }
+
+  // Small delay before strict retry
+  await sleep(500)
 
   // Attempt 3: Primary model with strict retry (prepend JSON-only instruction to user message)
   return await callExtractor(client, docText, NIM_MODEL, true)
