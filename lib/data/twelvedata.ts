@@ -1,14 +1,15 @@
 import type { Candle } from '@/lib/types/replay'
 import { TF_TO_TWELVE_DATA, type Timeframe } from '@/lib/types/replay'
 
-// ── Rate Limiter (token bucket: 8 credits/min, 800/day) ──────────────────────
+// ── Rate Limiter (8 credits/min, 800/day) ────────────────────────────────────
+// Strict pacing instead of a token bucket: a burst of 8 requests in 2 seconds
+// can straddle Twelve Data's rolling minute window and still trip the limit.
+// Spacing every request ≥8s apart guarantees we stay under 8/min.
 
-const RATE_LIMIT_TOKENS = 8
-const RATE_LIMIT_INTERVAL_MS = 60_000
+const MIN_REQUEST_GAP_MS = 8_000 // 60s / 8 credits, with margin
 const DAILY_LIMIT = 800
 
-let tokens = RATE_LIMIT_TOKENS
-let lastRefill = Date.now()
+let lastRequestAt = 0
 let dailyUsage = 0
 let dailyResetDay = new Date().getDate()
 
@@ -24,19 +25,11 @@ async function acquireToken(): Promise<void> {
     throw new Error('Twelve Data daily API limit approaching. Try again tomorrow.')
   }
 
-  // Refill tokens based on elapsed time
-  const now = Date.now()
-  const elapsed = now - lastRefill
-  tokens = Math.min(RATE_LIMIT_TOKENS, tokens + (elapsed / RATE_LIMIT_INTERVAL_MS) * RATE_LIMIT_TOKENS)
-  lastRefill = now
-
-  if (tokens < 1) {
-    const waitMs = Math.ceil((1 - tokens) * (RATE_LIMIT_INTERVAL_MS / RATE_LIMIT_TOKENS))
-    await sleep(Math.max(waitMs, 500))
-    tokens = Math.min(RATE_LIMIT_TOKENS, tokens + 1)
+  const waitMs = lastRequestAt + MIN_REQUEST_GAP_MS - Date.now()
+  if (waitMs > 0) {
+    await sleep(waitMs)
   }
-
-  tokens -= 1
+  lastRequestAt = Date.now()
   dailyUsage += 1
 }
 
@@ -99,7 +92,9 @@ export async function fetchTimeSeries(params: FetchTimeSeriesParams): Promise<Ca
 
 /**
  * Fetch time series with pagination for large date ranges (>5000 candles).
- * Splits into chunks with a 1-second delay between paginated requests.
+ * Twelve Data returns at most 5000 rows per request, so each chunk is sized
+ * per-interval to stay under that cap (e.g. ~3 days of 1m bars vs 90 days of
+ * 4H bars). The rate limiter spaces requests ≥8s apart.
  */
 export async function fetchTimeSeriesPaginated(
   symbol: string,
@@ -109,23 +104,24 @@ export async function fetchTimeSeriesPaginated(
 ): Promise<Candle[]> {
   const tdInterval = TF_TO_TWELVE_DATA[interval]
 
-  // First attempt — try the full range
-  const candles = await fetchTimeSeries({
-    symbol,
-    interval: tdInterval,
-    start_date: startDate,
-    end_date: endDate,
-  })
+  // Approximate candles per day per timeframe; keep every request under 5000 rows
+  const BARS_PER_DAY: Record<Timeframe, number> = {
+    '1m': 1440,
+    '5m': 288,
+    '15m': 96,
+    '30m': 48,
+    '1H': 24,
+    '4H': 6,
+    '1D': 1,
+    '1W': 1 / 7,
+    '1M': 1 / 30,
+  }
+  const chunkDays = Math.max(1, Math.floor(4800 / BARS_PER_DAY[interval]))
+  const chunkMs = chunkDays * 24 * 60 * 60 * 1000
 
-  // If the response seems complete, return it
-  // Twelve Data returns up to 5000 rows per request on free tier
-  if (candles.length < 5000) return candles
-
-  // For very large ranges, paginate by splitting into ~90-day chunks
   const allCandles: Candle[] = []
-  const start = new Date(startDate)
-  const end = new Date(endDate)
-  const chunkMs = 90 * 24 * 60 * 60 * 1000 // 90 days per chunk
+  const start = new Date(`${startDate}T00:00:00Z`)
+  const end = new Date(`${endDate}T23:59:59Z`)
 
   let chunkStart = new Date(start)
 
@@ -140,17 +136,10 @@ export async function fetchTimeSeriesPaginated(
     })
 
     allCandles.push(...chunk)
-
-    // Move to next chunk (add 1 day to avoid overlap)
-    chunkStart = new Date(chunkEnd.getTime() + 24 * 60 * 60 * 1000)
-
-    // 1-second delay between paginated requests
-    if (chunkStart < end) {
-      await sleep(1000)
-    }
+    chunkStart = new Date(chunkEnd.getTime() + 1) // advance without gaps; dedupe below
   }
 
-  // Deduplicate by time (pagination overlaps possible)
+  // Deduplicate by time (chunk boundaries can share a bar)
   const seen = new Set<string>()
   return allCandles.filter((c) => {
     if (seen.has(c.time)) return false
