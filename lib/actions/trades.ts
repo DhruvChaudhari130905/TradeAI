@@ -200,6 +200,7 @@ export async function getTrades(filters?: {
   pair?: string
   dateFrom?: string
   dateTo?: string
+  source?: string
 }) {
   try {
     const supabase = await createClient()
@@ -216,6 +217,10 @@ export async function getTrades(filters?: {
       .order('entry_time', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
 
+    // Column has NOT NULL DEFAULT 'live' so a plain equality filter covers both
+    if (filters?.source === 'backtest' || filters?.source === 'live') {
+      query = query.eq('source', filters.source)
+    }
     if (filters?.market) query = query.eq('market', filters.market)
     if (filters?.outcome) query = query.eq('outcome', filters.outcome)
     if (filters?.direction) query = query.eq('direction', filters.direction)

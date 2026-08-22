@@ -1,5 +1,5 @@
-import type { Candle } from '@/lib/types/backtest'
-import { TF_TO_TWELVE_DATA, type BacktestTimeframe } from '@/lib/types/backtest'
+import type { Candle } from '@/lib/types/replay'
+import { TF_TO_TWELVE_DATA, type Timeframe } from '@/lib/types/replay'
 
 // ── Rate Limiter (token bucket: 8 credits/min, 800/day) ──────────────────────
 
@@ -103,7 +103,7 @@ export async function fetchTimeSeries(params: FetchTimeSeriesParams): Promise<Ca
  */
 export async function fetchTimeSeriesPaginated(
   symbol: string,
-  interval: BacktestTimeframe,
+  interval: Timeframe,
   startDate: string,
   endDate: string,
 ): Promise<Candle[]> {

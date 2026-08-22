@@ -22,6 +22,7 @@ export default function JournalPage() {
 
   const [trades, setTrades] = useState<TradeRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [sourceTab, setSourceTab] = useState<'live' | 'backtest'>('live')
 
   // Filters
   const [market, setMarket] = useState(searchParams.get('market') ?? '')
@@ -41,6 +42,7 @@ export default function JournalPage() {
         pair: pairSearch || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
+        source: sourceTab,
       })
       if (result.success) {
         setTrades(result.data as TradeRow[])
@@ -48,7 +50,7 @@ export default function JournalPage() {
       setLoading(false)
     }
     load()
-  }, [market, outcome, direction, pairSearch, dateFrom, dateTo])
+  }, [sourceTab, market, outcome, direction, pairSearch, dateFrom, dateTo])
 
   // Summary stats
   const stats = useMemo(() => {
@@ -93,6 +95,22 @@ export default function JournalPage() {
             Log Trade
           </Button>
         </Link>
+      </div>
+
+      {/* Live / Backtest tabs */}
+      <div className="inline-flex rounded-lg border border-zinc-800 bg-[#12141A] p-0.5">
+        {(['live', 'backtest'] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setSourceTab(tab)}
+            className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+              sourceTab === tab ? 'bg-[#00FF9C]/15 text-[#00FF9C]' : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            {tab === 'live' ? 'Live' : 'Backtest'}
+          </button>
+        ))}
       </div>
 
       {/* Summary Stats */}
@@ -257,8 +275,13 @@ export default function JournalPage() {
                 className="flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800 bg-[#12141A] px-4 py-3 transition-colors hover:border-zinc-700 sm:flex-nowrap sm:gap-4"
               >
                 {/* Pair */}
-                <span className="min-w-0 flex-1 font-mono text-sm font-semibold text-white sm:w-24 sm:flex-none">
+                <span className="flex min-w-0 flex-1 items-center gap-1.5 font-mono text-sm font-semibold text-white sm:w-24 sm:flex-none">
                   {trade.pair}
+                  {trade.source === 'backtest' && (
+                    <Badge variant="outline" className="border-sky-500/30 px-1 py-0 text-[9px] uppercase text-sky-400">
+                      BT
+                    </Badge>
+                  )}
                 </span>
 
                 {/* Direction badge */}

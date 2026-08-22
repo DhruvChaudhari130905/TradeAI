@@ -2,7 +2,6 @@
 
 import { createClient } from '@/lib/supabase/server'
 import type { Trade } from '@/lib/types/trade'
-import type { BacktestRun } from '@/lib/types/backtest'
 
 export interface DashboardStats {
   totalTrades: number
@@ -15,7 +14,6 @@ export interface DashboardData {
   stats: DashboardStats
   trades: TradeWithScore[]
   recentTrades: TradeWithScore[]
-  recentBacktests: BacktestRun[]
 }
 
 export type TradeWithScore = Trade & {
@@ -35,24 +33,13 @@ export async function getDashboardData(): Promise<
       return { success: false, error: 'Not authenticated' }
     }
 
-    // Fetch trades and backtests in parallel
-    const [tradesResult, backtestsResult] = await Promise.all([
-      supabase
-        .from('trades')
-        .select('*, trade_reviews(composite_score)')
-        .eq('user_id', user.id)
-        .order('entry_time', { ascending: true, nullsFirst: false }),
-      supabase
-        .from('backtest_runs')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'complete')
-        .order('created_at', { ascending: false })
-        .limit(3),
-    ])
+    const tradesResult = await supabase
+      .from('trades')
+      .select('*, trade_reviews(composite_score)')
+      .eq('user_id', user.id)
+      .order('entry_time', { ascending: true, nullsFirst: false })
 
     const trades = (tradesResult.data as TradeWithScore[]) ?? []
-    const backtests = (backtestsResult.data as BacktestRun[]) ?? []
 
     // Compute stats
     const totalTrades = trades.length
@@ -78,7 +65,6 @@ export async function getDashboardData(): Promise<
         stats: { totalTrades, winRate, netPnl, avgAiScore },
         trades, // chronological order for charts
         recentTrades,
-        recentBacktests: backtests,
       },
     }
   } catch (error) {

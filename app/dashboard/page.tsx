@@ -8,14 +8,12 @@ import { PnlChart } from '@/components/dashboard/PnlChart'
 import { WinLossChart } from '@/components/dashboard/WinLossChart'
 import { AiScoreChart } from '@/components/dashboard/AiScoreChart'
 import { RecentTrades } from '@/components/dashboard/RecentTrades'
-import { RecentBacktests } from '@/components/dashboard/RecentBacktests'
 import { InsightsPanel } from '@/components/dashboard/InsightsPanel'
 import { Button } from '@/components/ui/button'
 import { LayoutDashboard, BookOpen, FlaskConical, RefreshCw, CalendarDays } from 'lucide-react'
 import Link from 'next/link'
 import type { DashboardStats } from '@/lib/actions/dashboard'
 import type { Trade } from '@/lib/types/trade'
-import type { BacktestRun } from '@/lib/types/backtest'
 
 type TradeWithScore = Trade & {
   trade_reviews: { composite_score: number | null }[]
@@ -88,7 +86,6 @@ export default function DashboardPage() {
 
   const [profile, setProfile] = useState<{ username: string | null } | null>(null)
   const [allTrades, setAllTrades] = useState<TradeWithScore[]>([])
-  const [backtests, setBacktests] = useState<BacktestRun[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -107,28 +104,19 @@ export default function DashboardPage() {
         return
       }
 
-      const [profileRes, tradesRes, backtestsRes] = await Promise.all([
+      const [profileRes, tradesRes] = await Promise.all([
         supabase.from('profiles').select('username').eq('id', user.id).single(),
         supabase
           .from('trades')
           .select('*, trade_reviews(composite_score)')
           .eq('user_id', user.id)
           .order('entry_time', { ascending: true, nullsFirst: false }),
-        supabase
-          .from('backtest_runs')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('status', 'complete')
-          .order('created_at', { ascending: false })
-          .limit(3),
       ])
 
       if (tradesRes.error) throw tradesRes.error
-      if (backtestsRes.error) throw backtestsRes.error
 
       setProfile(profileRes.data)
       setAllTrades((tradesRes.data as TradeWithScore[]) ?? [])
-      setBacktests((backtestsRes.data as BacktestRun[]) ?? [])
     } catch (err) {
       console.error('[DashboardPage]', err)
       setError('Failed to load dashboard data. Please try again.')
@@ -181,7 +169,7 @@ export default function DashboardPage() {
     [filteredTrades],
   )
 
-  const isEmpty = allTrades.length === 0 && backtests.length === 0
+  const isEmpty = allTrades.length === 0
   const hasFilteredResults = filteredTrades.length > 0
 
   // ── Period switcher ──
@@ -346,9 +334,8 @@ export default function DashboardPage() {
               <AiScoreChart trades={filteredTrades} />
 
               {/* ── Bottom Row: Recent Activity + Insights ── */}
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <RecentTrades trades={recentTrades} />
-                <RecentBacktests backtests={backtests} />
                 <InsightsPanel tradeCount={stats.totalTrades} />
               </div>
             </>

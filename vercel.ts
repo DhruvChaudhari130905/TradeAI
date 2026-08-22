@@ -5,20 +5,22 @@ export const config: VercelConfig = {
   buildCommand: 'npm run build',
   framework: 'nextjs',
   functions: {
-    // Backtest API routes need extended timeout for:
-    // - Twelve Data API pagination (1s delay per chunk for large date ranges)
-    // - Backtest engine bar-by-bar simulation (CPU intensive)
-    // - Parallel NIM API calls (report + 5 personalities = 6 concurrent calls)
-    'app/api/backtest/**': {
-      maxDuration: 300, // 5 minutes max (Hobby limit), up to 800s on Pro/Enterprise
-      memory: 1024,     // 1GB memory for backtest engine arrays
-    },
-    // Rule extraction also needs time for NIM calls (up to 3 attempts)
-    'app/api/backtest/route.ts': {
+    // Replay candle fetching: Twelve Data API pagination (1s delay per chunk
+    // for large date ranges, one request per timeframe)
+    'app/api/replay/[id]/candles/route.ts': {
       maxDuration: 120,
       memory: 512,
     },
-    // AI review endpoints
+    // Replay AI endpoints (NIM calls: coach chat + 5 parallel personalities)
+    'app/api/replay/[id]/chat/route.ts': {
+      maxDuration: 60,
+      memory: 512,
+    },
+    'app/api/replay/[id]/review/route.ts': {
+      maxDuration: 120,
+      memory: 512,
+    },
+    // Journal trade AI review endpoint
     'app/api/review/**': {
       maxDuration: 60,
       memory: 512,

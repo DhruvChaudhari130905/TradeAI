@@ -1,14 +1,14 @@
-import type { Candle, BacktestTimeframe, TF_TO_TWELVE_DATA } from '@/lib/types/backtest'
+import type { Candle, Timeframe } from '@/lib/types/replay'
 import { fetchTimeSeriesPaginated } from './twelvedata'
 
 /**
  * Fetch OHLCV data from Twelve Data (no caching).
- * Downloads data fresh each time, discards after simulation.
+ * Downloads data fresh each time.
  */
 export async function fetchOHLCV(params: {
   pair: string
   market: 'forex' | 'crypto'
-  timeframe: BacktestTimeframe
+  timeframe: Timeframe
   dateFrom: string
   dateTo: string
 }): Promise<Candle[]> {

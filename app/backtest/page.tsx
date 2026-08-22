@@ -1,683 +1,342 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { FlaskConical, Upload, Loader2, History, PenLine } from 'lucide-react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
+import { Play, Plus, Loader2 } from 'lucide-react'
+import {
+  createReplaySession,
+  listReplaySessions,
+} from '@/lib/actions/replay'
 import { FOREX_PAIRS, CRYPTO_PAIRS } from '@/lib/types/trade'
-import { BACKTEST_TIMEFRAMES } from '@/lib/types/backtest'
-import type { StrategyRuleSet, ExecutionConfig, BacktestTimeframe } from '@/lib/types/backtest'
-import { RuleBuilder } from '@/components/backtest/rule-builder'
+import { TIMEFRAMES } from '@/lib/types/replay'
+import type { Timeframe } from '@/lib/types/replay'
 
-type Mode = 'upload' | 'manual'
-
-const DEFAULT_EXECUTION_CONFIG: ExecutionConfig = {
-  spread_pips: 1.0,
-  slippage_pips: 0.5,
-  commission_per_lot: 7.0,
-  swap_long_per_day: 0,
-  swap_short_per_day: 0,
-  leverage: 100,
+// Default spread presets in pips (crypto pips = whole USD units of the coin)
+const SPREAD_PRESETS: Record<string, number> = {
+  'EUR/USD': 0.6, 'GBP/USD': 0.9, 'USD/JPY': 0.7, 'USD/CHF': 1.0,
+  'AUD/USD': 0.8, 'NZD/USD': 1.2, 'USD/CAD': 1.2, 'EUR/GBP': 1.2,
+  'EUR/JPY': 1.3, 'GBP/JPY': 2.0, 'EUR/CHF': 1.4, 'EUR/AUD': 1.5,
+  'GBP/CHF': 2.0, 'GBP/AUD': 2.5, 'AUD/JPY': 1.5, 'NZD/JPY': 1.8,
+  'CAD/JPY': 1.7, 'CHF/JPY': 1.8, 'AUD/NZD': 2.0, 'EUR/NZD': 2.5,
+  'BTC/USD': 20, 'ETH/USD': 4, 'SOL/USD': 0.5, 'XRP/USD': 0.01,
+  'ADA/USD': 0.01, 'DOGE/USD': 0.0005, 'AVAX/USD': 0.1, 'DOT/USD': 0.05,
+  'MATIC/USD': 0.01, 'LINK/USD': 0.05, 'UNI/USD': 0.05, 'ATOM/USD': 0.05,
+  'LTC/USD': 0.5, 'BCH/USD': 1, 'NEAR/USD': 0.02, 'ALGO/USD': 0.005,
+  'FIL/USD': 0.02, 'HBAR/USD': 0.002, 'FTM/USD': 0.005, 'AAVE/USD': 0.5,
 }
 
-const EMPTY_RULES: StrategyRuleSet = {
-  name: 'Untitled Strategy',
-  indicators: [],
-  entry_long: [],
-  entry_short: [],
-  exit_long: [],
-  exit_short: [],
-  stop_loss: { method: 'atr_based', atr_multiplier: 1.5 },
-  take_profit: { method: 'risk_reward', rr_ratio: 2 },
-  risk_per_trade_pct: 1,
-  position_sizing: { method: 'risk_based' },
-  session_filter: null,
-  invalidation: [],
-  trade_management: [],
-  order_type: 'market',
-  timeframe: '1D',
-  notes: '',
+type SessionListItem = {
+  id: string
+  pair: string
+  market: 'forex' | 'crypto'
+  timeframes: Timeframe[]
+  status: 'active' | 'complete' | 'abandoned'
+  balance: number
+  starting_balance: number
+  created_at: string
 }
 
 export default function BacktestPage() {
   const router = useRouter()
-  const [mode, setMode] = useState<Mode>('upload')
 
-  // Shared state
-  const [strategyName, setStrategyName] = useState('')
   const [market, setMarket] = useState<'forex' | 'crypto'>('forex')
-  const [pair, setPair] = useState('')
-  const [timeframe, setTimeframe] = useState('1D')
+  const [pair, setPair] = useState('EUR/USD')
+  const [timeframes, setTimeframes] = useState<Timeframe[]>(['15m', '4H'])
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
-  const [startingCapital, setStartingCapital] = useState('10000')
-  const [uploading, setUploading] = useState(false)
+  const [balance, setBalance] = useState('10000')
+  const [leverage, setLeverage] = useState('100')
+  const [spreadPips, setSpreadPips] = useState('0.6')
 
-  // Upload mode state
-  const [docFile, setDocFile] = useState<File | null>(null)
+  const [sessions, setSessions] = useState<SessionListItem[] | null>(null)
+  const [creating, setCreating] = useState(false)
 
-  // Manual mode state
-  const [rules, setRules] = useState<StrategyRuleSet>(EMPTY_RULES)
-  const [executionConfig, setExecutionConfig] = useState<ExecutionConfig>(DEFAULT_EXECUTION_CONFIG)
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    listReplaySessions().then((res) => {
+      if (res.success) setSessions(res.data)
+      else setSessions([])
+    })
+  }, [])
 
-  const pairs = useMemo(() => {
-    return market === 'forex' ? FOREX_PAIRS : CRYPTO_PAIRS
-  }, [market])
+  function handlePairChange(next: string | null) {
+    if (!next) return
+    setPair(next)
+    setSpreadPips(String(SPREAD_PRESETS[next] ?? 1))
+  }
 
-  // Default date range: last 365 days
-  const getDefaultDates = () => {
-    const to = new Date()
-    const from = new Date()
-    from.setFullYear(from.getFullYear() - 1)
-    return {
-      from: from.toISOString().split('T')[0],
-      to: to.toISOString().split('T')[0],
+  function handleMarketChange(next: 'forex' | 'crypto') {
+    setMarket(next)
+    if (next === 'crypto') {
+      setPair('BTC/USD')
+      setLeverage('1')
+      setSpreadPips(String(SPREAD_PRESETS['BTC/USD'] ?? 1))
+    } else {
+      setPair('EUR/USD')
+      setLeverage('100')
+      setSpreadPips(String(SPREAD_PRESETS['EUR/USD'] ?? 1))
     }
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    if (!file.name.endsWith('.txt') && !file.name.endsWith('.pdf')) {
-      toast.error('Only .txt and .pdf files are accepted')
-      return
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('File must be under 5MB')
-      return
-    }
-
-    setDocFile(file)
+  function toggleTimeframe(tf: Timeframe) {
+    setTimeframes((prev) => {
+      if (prev.includes(tf)) return prev.filter((t) => t !== tf)
+      if (prev.length >= 3) {
+        toast.error('Max 3 timeframes per session.')
+        return prev
+      }
+      return [...prev, tf]
+    })
   }
 
-  const handleUploadSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!docFile) {
-      toast.error('Please upload a strategy document')
+  async function handleCreate() {
+    if (timeframes.length === 0) {
+      toast.error('Select at least one timeframe.')
       return
     }
-    if (!pair) {
-      toast.error('Please select a pair')
+    if (!dateFrom || !dateTo) {
+      toast.error('Pick a date range.')
       return
     }
 
-    setUploading(true)
-
+    setCreating(true)
     try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        toast.error('Not authenticated')
-        setUploading(false)
-        return
-      }
-
-      const ext = docFile.name.split('.').pop() ?? 'txt'
-      const storagePath = `${user.id}/${Date.now()}-${docFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
-      const { error: uploadError } = await supabase.storage
-        .from('strategy-docs')
-        .upload(storagePath, docFile)
-
-      if (uploadError) {
-        console.error('[backtest] doc upload failed:', uploadError)
-        toast.error('Failed to upload strategy document')
-        setUploading(false)
-        return
-      }
-
-      const response = await fetch('/api/backtest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          strategyDocUrl: storagePath,
-          strategyName: strategyName || docFile.name.replace(/\.[^/.]+$/, ''),
-          market,
-          pair,
-          timeframe,
-          dateFrom: dateFrom || getDefaultDates().from,
-          dateTo: dateTo || getDefaultDates().to,
-          startingCapital: Number(startingCapital) || 10000,
-        }),
+      const res = await createReplaySession({
+        pair,
+        market,
+        timeframes: [...timeframes].sort(
+          (a, b) => TIMEFRAMES.indexOf(a) - TIMEFRAMES.indexOf(b),
+        ), // primary = lowest TF first
+        dateFrom,
+        dateTo,
+        startingBalance: Number(balance),
+        leverage: Number(leverage),
+        spreadPips: Number(spreadPips),
       })
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        toast.error(data.error || 'Failed to start backtest')
-        setUploading(false)
+      if (!res.success) {
+        toast.error(res.error)
         return
       }
 
-      router.push(`/backtest/${data.backtestId}/review`)
-    } catch (error) {
-      console.error('[backtest] submit error:', error)
+      // Warm candle data before redirect so replay opens instantly-ready or with clear error
+      const candlesRes = await fetch(`/api/replay/${res.data.id}/candles`)
+      if (!candlesRes.ok) {
+        const body = await candlesRes.json().catch(() => null)
+        toast.error(body?.error ?? 'Failed to fetch historical data.')
+      }
+      router.push(`/backtest/${res.data.id}/session`)
+    } catch {
       toast.error('Something went wrong. Please try again.')
     } finally {
-      setUploading(false)
+      setCreating(false)
     }
   }
 
-  const handleManualSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!pair) {
-      toast.error('Please select a pair')
-      return
-    }
-
-    setUploading(true)
-
-    try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        toast.error('Not authenticated')
-        setUploading(false)
-        return
-      }
-
-      // Create backtest run with manual rules
-      const createResponse = await fetch('/api/backtest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          mode: 'manual',
-          strategyName: strategyName || rules.name || 'Manual Strategy',
-          market,
-          pair,
-          timeframe,
-          dateFrom: dateFrom || getDefaultDates().from,
-          dateTo: dateTo || getDefaultDates().to,
-          startingCapital: Number(startingCapital) || 10000,
-          approvedRules: rules,
-          executionConfig,
-        }),
-      })
-
-      const createData = await createResponse.json()
-
-      if (!createResponse.ok) {
-        toast.error(createData.error || 'Failed to create backtest')
-        setUploading(false)
-        return
-      }
-
-      const backtestId = createData.backtestId
-
-      // Start execution directly
-      const execResponse = await fetch(`/api/backtest/${backtestId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          approvedRules: rules,
-          executionConfig,
-        }),
-      })
-
-      if (!execResponse.ok) {
-        const execData = await execResponse.json()
-        toast.error(execData.error || 'Failed to start backtest execution')
-        setUploading(false)
-        return
-      }
-
-      router.push(`/backtest/${backtestId}`)
-    } catch (error) {
-      console.error('[backtest] manual submit error:', error)
-      toast.error('Something went wrong. Please try again.')
-    } finally {
-      setUploading(false)
-    }
-  }
+  const activeSessions = sessions?.filter((s) => s.status === 'active') ?? []
+  const pastSessions = sessions?.filter((s) => s.status !== 'active') ?? []
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">
-            AI Backtest
-          </h1>
-          <p className="mt-1 text-sm text-zinc-400">
-            {mode === 'upload'
-              ? 'Upload a strategy document and simulate it on historical data.'
-              : 'Define strategy rules manually and run a backtest.'}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Mode toggle */}
-          <div className="flex rounded-lg border border-zinc-800 bg-[#12141A] p-0.5">
-            <button
-              onClick={() => setMode('upload')}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                mode === 'upload' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              <Upload className="h-3.5 w-3.5" />
-              Upload Doc
-            </button>
-            <button
-              onClick={() => setMode('manual')}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                mode === 'manual' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              <PenLine className="h-3.5 w-3.5" />
-              Manual
-            </button>
-          </div>
-          <Link href="/backtest/history">
-            <Button variant="outline" className="gap-2 border-zinc-800 text-zinc-400 hover:text-white">
-              <History className="h-4 w-4" />
-              Past Runs
-            </Button>
-          </Link>
-        </div>
+    <div className="mx-auto max-w-3xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Replay Trading</h1>
+        <p className="mt-1 text-sm text-zinc-400">
+          Trade historical markets bar-by-bar like live price action. Practice setups, get AI feedback, log every trade.
+        </p>
       </div>
 
-      {mode === 'upload' ? (
-        /* ── Upload mode ────────────────────────────────────────────────── */
-        <form onSubmit={handleUploadSubmit}>
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {/* Left column — Strategy Upload */}
-            <div className="space-y-6 lg:col-span-2">
-              <Card className="border-zinc-800 bg-[#12141A]">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-semibold text-zinc-400">Strategy Document</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label className="text-xs text-zinc-500">Strategy Name</Label>
-                    <Input
-                      value={strategyName}
-                      onChange={(e) => setStrategyName(e.target.value)}
-                      placeholder="e.g. EMA Crossover on EUR/USD"
-                      className="mt-1.5 h-9 border-zinc-800 bg-[#0A0B0E] text-sm text-white placeholder:text-zinc-600"
-                    />
-                  </div>
-
-                  <div>
-                    <Label className="text-xs text-zinc-500">Upload Document (.txt or .pdf, max 5MB)</Label>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-3">
-                      <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-zinc-700 bg-[#0A0B0E] px-4 py-3 text-sm text-zinc-400 transition-colors hover:border-[#00FF9C]/30 hover:text-white">
-                        <Upload className="h-4 w-4" />
-                        {docFile ? docFile.name : 'Choose file'}
-                        <input
-                          type="file"
-                          accept=".txt,.pdf"
-                          onChange={handleFileChange}
-                          className="hidden"
-                        />
-                      </label>
-                      {docFile && (
-                        <span className="text-xs text-[#00FF9C]">
-                          ✓ {(docFile.size / 1024).toFixed(0)} KB
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg border border-zinc-800 bg-[#0A0B0E] p-4">
-                    <p className="text-xs text-zinc-500 leading-relaxed">
-                      <span className="font-semibold text-zinc-400">Tips for best results:</span> Include clear entry and exit conditions, stop loss and take profit rules, and the timeframe your strategy is designed for. The AI will extract actionable rules from your document and apply them bar-by-bar to historical data.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Right column — Parameters */}
-            <div className="space-y-6">
-              <ParametersPanel
-                market={market} setMarket={setMarket}
-                pair={pair} setPair={setPair}
-                pairs={pairs}
-                timeframe={timeframe} setTimeframe={setTimeframe}
-                dateFrom={dateFrom} setDateFrom={setDateFrom}
-                dateTo={dateTo} setDateTo={setDateTo}
-                startingCapital={startingCapital} setStartingCapital={setStartingCapital}
-                getDefaultDates={getDefaultDates}
-              />
-              <Button
-                type="submit"
-                disabled={uploading}
-                className="mt-2 w-full gap-2 bg-[#00FF9C] text-[#0A0B0E] hover:bg-[#00FF9C]/90"
+      {/* ── Active sessions (resume) ── */}
+      {activeSessions.length > 0 && (
+        <Card className="border-[#27272A] bg-[#12141A]">
+          <CardHeader>
+            <CardTitle className="text-base">Resume Session</CardTitle>
+            <CardDescription>Pick up exactly where you left off.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {activeSessions.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => router.push(`/backtest/${s.id}/session`)}
+                className="flex w-full items-center justify-between rounded-lg border border-[#27272A] px-4 py-3 text-left transition-colors hover:border-[#00FF9C]/50 hover:bg-[#1C1E26]"
               >
-                {uploading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Starting Backtest…
-                  </>
-                ) : (
-                  <>
-                    <FlaskConical className="h-4 w-4" />
-                    Run Backtest
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </form>
-      ) : (
-        /* ── Manual mode ────────────────────────────────────────────────── */
-        <form onSubmit={handleManualSubmit}>
-          <div className="space-y-6">
-            {/* Parameters row */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div>
-                <Label className="text-xs text-zinc-500">Strategy Name</Label>
-                <Input
-                  value={strategyName}
-                  onChange={(e) => setStrategyName(e.target.value)}
-                  placeholder="e.g. EMA Crossover"
-                  className="mt-1.5 h-9 border-zinc-800 bg-[#0A0B0E] text-sm text-white placeholder:text-zinc-600"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-zinc-500">Market</Label>
-                <Select value={market} onValueChange={(v) => { setMarket((v ?? 'forex') as 'forex' | 'crypto'); setPair('') }}>
-                  <SelectTrigger className="mt-1.5 h-9 border-zinc-800 bg-[#0A0B0E] text-sm text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="border-zinc-800 bg-[#12141A]">
-                    <SelectItem value="forex" className="text-white">Forex</SelectItem>
-                    <SelectItem value="crypto" className="text-white">Crypto</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs text-zinc-500">Pair</Label>
-                <Select value={pair} onValueChange={(v) => setPair(v ?? '')}>
-                  <SelectTrigger className="mt-1.5 h-9 border-zinc-800 bg-[#0A0B0E] text-sm font-mono text-white">
-                    <SelectValue placeholder="Select pair" />
-                  </SelectTrigger>
-                  <SelectContent className="border-zinc-800 bg-[#12141A]">
-                    {pairs.map((p) => (
-                      <SelectItem key={p} value={p} className="font-mono text-white">
-                        {p}
-                      </SelectItem>
+                <div>
+                  <span className="font-mono font-medium">{s.pair}</span>
+                  <span className="ml-2 flex gap-1 sm:inline-flex sm:ml-0">
+                    {(s.timeframes as Timeframe[]).map((tf) => (
+                      <Badge key={tf} variant="secondary" className="font-mono text-xs">{tf}</Badge>
                     ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs text-zinc-500">Timeframe</Label>
-                <Select value={timeframe} onValueChange={(v) => setTimeframe(v ?? '1D')}>
-                  <SelectTrigger className="mt-1.5 h-9 border-zinc-800 bg-[#0A0B0E] text-sm text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="border-zinc-800 bg-[#12141A]">
-                    {BACKTEST_TIMEFRAMES.map((tf) => (
-                      <SelectItem key={tf} value={tf} className="font-mono text-white">
-                        {tf}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+                  </span>
+                  <span className="block text-xs text-zinc-500">
+                    Balance ${Number(s.balance).toLocaleString()} · started {new Date(s.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+                <Play className="h-4 w-4 text-[#00FF9C]" />
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div>
-                <Label className="text-xs text-zinc-500">From</Label>
-                <Input
-                  type="date"
-                  value={dateFrom || getDefaultDates().from}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  max={dateTo || undefined}
-                  className="mt-1.5 h-9 border-zinc-800 bg-[#0A0B0E] text-sm text-white"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-zinc-500">To</Label>
-                <Input
-                  type="date"
-                  value={dateTo || getDefaultDates().to}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  min={dateFrom || undefined}
-                  className="mt-1.5 h-9 border-zinc-800 bg-[#0A0B0E] text-sm text-white"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-zinc-500">Starting Capital ($)</Label>
-                <Input
-                  type="number"
-                  value={startingCapital}
-                  onChange={(e) => setStartingCapital(e.target.value)}
-                  min={100}
-                  step={100}
-                  className="mt-1.5 h-9 border-zinc-800 bg-[#0A0B0E] font-mono text-sm text-white"
-                />
-              </div>
-              <div className="flex items-end">
+      {/* ── New session ── */}
+      <Card className="border-[#27272A] bg-[#12141A]">
+        <CardHeader>
+          <CardTitle className="text-base">New Replay Session</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {/* Market */}
+          <div className="space-y-2">
+            <Label>Market</Label>
+            <div className="flex gap-2">
+              {(['forex', 'crypto'] as const).map((m) => (
                 <Button
-                  type="submit"
-                  disabled={uploading}
-                  className="w-full gap-2 bg-[#00FF9C] text-[#0A0B0E] hover:bg-[#00FF9C]/90"
+                  key={m}
+                  type="button"
+                  size="sm"
+                  variant={market === m ? 'default' : 'outline'}
+                  onClick={() => handleMarketChange(m)}
+                  className={market === m ? 'bg-[#00FF9C] text-[#0A0B0E]' : 'border-[#27272A]'}
                 >
-                  {uploading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Running…
-                    </>
-                  ) : (
-                    <>
-                      <FlaskConical className="h-4 w-4" />
-                      Run Backtest
-                    </>
-                  )}
+                  {m === 'forex' ? 'Forex' : 'Crypto'}
                 </Button>
-              </div>
-            </div>
-
-            {/* Rules + Execution Config */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-              <div className="lg:col-span-2">
-                <RuleBuilder rules={rules} onChange={setRules} />
-              </div>
-              <div>
-                <Card className="border-zinc-800 bg-[#12141A]">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-semibold text-zinc-400">Execution Config</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label className="text-xs text-zinc-500">Spread (pips)</Label>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          value={executionConfig.spread_pips}
-                          onChange={(e) => setExecutionConfig({ ...executionConfig, spread_pips: Number(e.target.value) })}
-                          className="mt-1 h-8 border-zinc-800 bg-[#0A0B0E] text-xs font-mono text-white"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs text-zinc-500">Slippage (pips)</Label>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          value={executionConfig.slippage_pips}
-                          onChange={(e) => setExecutionConfig({ ...executionConfig, slippage_pips: Number(e.target.value) })}
-                          className="mt-1 h-8 border-zinc-800 bg-[#0A0B0E] text-xs font-mono text-white"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs text-zinc-500">Commission ($/lot)</Label>
-                        <Input
-                          type="number"
-                          step="0.5"
-                          value={executionConfig.commission_per_lot}
-                          onChange={(e) => setExecutionConfig({ ...executionConfig, commission_per_lot: Number(e.target.value) })}
-                          className="mt-1 h-8 border-zinc-800 bg-[#0A0B0E] text-xs font-mono text-white"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs text-zinc-500">Leverage</Label>
-                        <Input
-                          type="number"
-                          step="10"
-                          value={executionConfig.leverage}
-                          onChange={(e) => setExecutionConfig({ ...executionConfig, leverage: Number(e.target.value) })}
-                          className="mt-1 h-8 border-zinc-800 bg-[#0A0B0E] text-xs font-mono text-white"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label className="text-xs text-zinc-500">Swap Long $/day</Label>
-                        <Input
-                          type="number"
-                          step="0.5"
-                          value={executionConfig.swap_long_per_day}
-                          onChange={(e) => setExecutionConfig({ ...executionConfig, swap_long_per_day: Number(e.target.value) })}
-                          className="mt-1 h-8 border-zinc-800 bg-[#0A0B0E] text-xs font-mono text-white"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs text-zinc-500">Swap Short $/day</Label>
-                        <Input
-                          type="number"
-                          step="0.5"
-                          value={executionConfig.swap_short_per_day}
-                          onChange={(e) => setExecutionConfig({ ...executionConfig, swap_short_per_day: Number(e.target.value) })}
-                          className="mt-1 h-8 border-zinc-800 bg-[#0A0B0E] text-xs font-mono text-white"
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              ))}
             </div>
           </div>
-        </form>
+
+          {/* Pair */}
+          <div className="space-y-2">
+            <Label>Pair</Label>
+            <Select value={pair} onValueChange={handlePairChange}>
+              <SelectTrigger className="w-full border-[#27272A]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="max-h-64 border-[#27272A] bg-[#12141A]">
+                {(market === 'forex' ? FOREX_PAIRS : CRYPTO_PAIRS).map((p) => (
+                  <SelectItem key={p} value={p} className="font-mono">{p}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Timeframes */}
+          <div className="space-y-2">
+            <Label>
+              Timeframes <span className="text-zinc-500">(up to 3 — lowest is the replay clock)</span>
+            </Label>
+            <div className="flex flex-wrap gap-2">
+              {TIMEFRAMES.map((tf) => (
+                <button
+                  key={tf}
+                  type="button"
+                  onClick={() => toggleTimeframe(tf)}
+                  className={`rounded-md border px-3 py-1.5 font-mono text-sm transition-colors ${
+                    timeframes.includes(tf)
+                      ? 'border-[#00FF9C] bg-[#00FF9C]/10 text-[#00FF9C]'
+                      : 'border-[#27272A] text-zinc-400 hover:border-zinc-600'
+                  }`}
+                >
+                  {tf}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Date range */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="date-from">From</Label>
+              <Input id="date-from" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+                className="border-[#27272A]" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="date-to">To</Label>
+              <Input id="date-to" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+                className="border-[#27272A]" />
+            </div>
+          </div>
+
+          {/* Account */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="balance">Starting balance ($)</Label>
+              <Input id="balance" type="number" min="1" value={balance} onChange={(e) => setBalance(e.target.value)}
+                className="border-[#27272A] font-mono" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="leverage">Leverage (1:x)</Label>
+              <Input id="leverage" type="number" min="1" value={leverage} onChange={(e) => setLeverage(e.target.value)}
+                className="border-[#27272A] font-mono" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="spread">Spread ({market === 'crypto' ? '$' : 'pips'})</Label>
+              <Input id="spread" type="number" step="any" min="0" value={spreadPips}
+                onChange={(e) => setSpreadPips(e.target.value)} className="border-[#27272A] font-mono" />
+            </div>
+          </div>
+
+          <Button
+            onClick={handleCreate}
+            disabled={creating}
+            className="w-full bg-[#00FF9C] text-[#0A0B0E] hover:bg-[#00FF9C]/90"
+          >
+            {creating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Fetching data…
+              </>
+            ) : (
+              <>
+                <Plus className="mr-2 h-4 w-4" /> Start Session
+              </>
+            )}
+          </Button>
+          <p className="text-xs text-zinc-500">
+            Historical data is fetched once at session start (Twelve Data free tier: 8 credits/min). Larger ranges take longer.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* ── Past sessions ── */}
+      {pastSessions.length > 0 && (
+        <Card className="border-[#27272A] bg-[#12141A]">
+          <CardHeader>
+            <CardTitle className="text-base">Past Sessions</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {pastSessions.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => router.push(`/backtest/${s.id}/results`)}
+                className="flex w-full items-center justify-between rounded-lg border border-[#27272A] px-4 py-3 text-left transition-colors hover:border-zinc-600 hover:bg-[#1C1E26]"
+              >
+                <div>
+                  <span className="font-mono font-medium">{s.pair}</span>
+                  <Badge
+                    variant="secondary"
+                    className={`ml-2 text-xs ${
+                      s.status === 'complete' ? 'bg-[#00FF9C]/10 text-[#00FF9C]' : 'bg-zinc-800 text-zinc-400'
+                    }`}
+                  >
+                    {s.status}
+                  </Badge>
+                  <span className="block text-xs text-zinc-500">
+                    {new Date(s.created_at).toLocaleDateString()} · P&L{' '}
+                    <span className={`font-mono ${(Number(s.balance) - Number(s.starting_balance)) >= 0 ? 'text-[#00FF9C]' : 'text-[#FF4D4D]'}`}>
+                      {(Number(s.balance) - Number(s.starting_balance)) >= 0 ? '+' : ''}
+                      {Math.round(Number(s.balance) - Number(s.starting_balance)).toLocaleString()}
+                    </span>
+                  </span>
+                </div>
+              </button>
+            ))}
+          </CardContent>
+        </Card>
       )}
     </div>
-  )
-}
-
-// ── Shared parameters panel (upload mode right column) ──────────────────────
-
-function ParametersPanel({
-  market, setMarket, pair, setPair, pairs,
-  timeframe, setTimeframe,
-  dateFrom, setDateFrom, dateTo, setDateTo,
-  startingCapital, setStartingCapital,
-  getDefaultDates,
-}: {
-  market: 'forex' | 'crypto'
-  setMarket: (m: 'forex' | 'crypto') => void
-  pair: string
-  setPair: (p: string) => void
-  pairs: string[]
-  timeframe: string
-  setTimeframe: (t: string) => void
-  dateFrom: string
-  setDateFrom: (d: string) => void
-  dateTo: string
-  setDateTo: (d: string) => void
-  startingCapital: string
-  setStartingCapital: (c: string) => void
-  getDefaultDates: () => { from: string; to: string }
-}) {
-  return (
-    <Card className="border-zinc-800 bg-[#12141A]">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-semibold text-zinc-400">Backtest Parameters</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div>
-          <Label className="text-xs text-zinc-500">Market</Label>
-          <Select value={market} onValueChange={(v) => { setMarket((v ?? 'forex') as 'forex' | 'crypto'); setPair('') }}>
-            <SelectTrigger className="mt-1.5 h-9 border-zinc-800 bg-[#0A0B0E] text-sm text-white">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="border-zinc-800 bg-[#12141A]">
-              <SelectItem value="forex" className="text-white">Forex</SelectItem>
-              <SelectItem value="crypto" className="text-white">Crypto</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label className="text-xs text-zinc-500">Pair</Label>
-          <Select value={pair} onValueChange={(v) => setPair(v ?? '')}>
-            <SelectTrigger className="mt-1.5 h-9 border-zinc-800 bg-[#0A0B0E] text-sm font-mono text-white">
-              <SelectValue placeholder="Select pair" />
-            </SelectTrigger>
-            <SelectContent className="border-zinc-800 bg-[#12141A]">
-              {pairs.map((p) => (
-                <SelectItem key={p} value={p} className="font-mono text-white">
-                  {p}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label className="text-xs text-zinc-500">Timeframe</Label>
-          <Select value={timeframe} onValueChange={(v) => setTimeframe(v ?? '1D')}>
-            <SelectTrigger className="mt-1.5 h-9 border-zinc-800 bg-[#0A0B0E] text-sm text-white">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="border-zinc-800 bg-[#12141A]">
-              {BACKTEST_TIMEFRAMES.map((tf) => (
-                <SelectItem key={tf} value={tf} className="font-mono text-white">
-                  {tf}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Label className="text-xs text-zinc-500">From</Label>
-            <Input
-              type="date"
-              value={dateFrom || getDefaultDates().from}
-              onChange={(e) => setDateFrom(e.target.value)}
-              max={dateTo || undefined}
-              className="mt-1.5 h-9 border-zinc-800 bg-[#0A0B0E] text-sm text-white"
-            />
-          </div>
-          <div>
-            <Label className="text-xs text-zinc-500">To</Label>
-            <Input
-              type="date"
-              value={dateTo || getDefaultDates().to}
-              onChange={(e) => setDateTo(e.target.value)}
-              min={dateFrom || undefined}
-              className="mt-1.5 h-9 border-zinc-800 bg-[#0A0B0E] text-sm text-white"
-            />
-          </div>
-        </div>
-
-        <div>
-          <Label className="text-xs text-zinc-500">Starting Capital ($)</Label>
-          <Input
-            type="number"
-            value={startingCapital}
-            onChange={(e) => setStartingCapital(e.target.value)}
-            min={100}
-            step={100}
-            className="mt-1.5 h-9 border-zinc-800 bg-[#0A0B0E] font-mono text-sm text-white"
-          />
-        </div>
-      </CardContent>
-    </Card>
   )
 }

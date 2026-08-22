@@ -24,6 +24,8 @@ export interface Trade {
   notes?: string | null
   screenshot_urls?: string[] | null
   tags?: string[] | null
+  source?: 'live' | 'backtest' | null
+  session_id?: string | null
   created_at: string
   updated_at: string
 }
