@@ -26,12 +26,14 @@ import type {
   ClosedReplayTrade,
   DrawingShape,
   OverlayIndicatorType,
+  PendingOrder,
   ReplayIndicatorConfig,
   ReplayPosition,
 } from '@/lib/types/replay'
 import { toChartTime } from '@/lib/replay/time'
 import { computeIndicators, type IndicatorSeries } from '@/lib/replay/indicators'
 import { DrawingOverlay, type DrawTool } from './DrawingOverlay'
+import { SlTpOverlay, type SlTpPatch } from './SlTpOverlay'
 
 const GREEN = '#00FF9C'
 const RED = '#FF4D4D'
@@ -42,6 +44,10 @@ const INDICATOR_COLORS: Record<OverlayIndicatorType, string> = {
   BBANDS: '#71717A',
   RSI: '#A78BFA',
   MACD: '#38BDF8',
+  ATR: '#FBBF24',
+  STOCH: '#34D399',
+  ADX: '#F472B6',
+  VWAP: '#E879F9',
 }
 
 export interface TradeMarkerData {
@@ -58,8 +64,16 @@ interface ChartPanelProps {
   drawingsHidden: boolean
   activeTool: DrawTool | null
   indicatorConfigs: ReplayIndicatorConfig[]
+  positions: ReplayPosition[]
+  orders: PendingOrder[]
+  draftSl: number | null
+  draftTp: number | null
+  currentPrice: number | null
+  equity: number
   onAddDrawing: (shape: DrawingShape) => void
   onEraseDrawing: (id: string) => void
+  onExecutePositionDrawing: (shape: DrawingShape) => void
+  onSlTpCommit: (patch: SlTpPatch) => void
 }
 
 // One rendered indicator line/band; sub picks a member of multi-series output
@@ -128,8 +142,16 @@ export function ChartPanel({
   drawingsHidden,
   activeTool,
   indicatorConfigs,
+  positions,
+  orders,
+  draftSl,
+  draftTp,
+  currentPrice,
+  equity,
   onAddDrawing,
   onEraseDrawing,
+  onExecutePositionDrawing,
+  onSlTpCommit,
 }: ChartPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
@@ -283,6 +305,29 @@ export function ChartPanel({
         handles.push({ series: macdLine, baseKey: 'macd', sub: 'macd' })
         handles.push({ series: signalLine, baseKey: 'macd', sub: 'signal' })
         paneIndex++
+      } else if (cfg.type === 'VWAP') {
+        const s = chart.addSeries(LineSeries, { color, lineWidth: 1 })
+        handles.push({ series: s, baseKey: 'vwap' })
+      } else if (cfg.type === 'ATR') {
+        const period = cfg.params.period ?? 14
+        const s = chart.addSeries(LineSeries, { color, lineWidth: 1 }, paneIndex)
+        handles.push({ series: s, baseKey: `atr_${period}` })
+        paneIndex++
+      } else if (cfg.type === 'ADX') {
+        const period = cfg.params.period ?? 14
+        const s = chart.addSeries(LineSeries, { color, lineWidth: 1 }, paneIndex)
+        s.createPriceLine({ price: 25, color: '#52525B', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false })
+        handles.push({ series: s, baseKey: `adx_${period}` })
+        paneIndex++
+      } else if (cfg.type === 'STOCH') {
+        const kLine = chart.addSeries(LineSeries, { color, lineWidth: 1 }, paneIndex)
+        const dLine = chart.addSeries(LineSeries, { color: '#FB923C', lineWidth: 1 }, paneIndex)
+        for (const level of [80, 20]) {
+          kLine.createPriceLine({ price: level, color: '#52525B', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false })
+        }
+        handles.push({ series: kLine, baseKey: 'stoch', sub: 'k' })
+        handles.push({ series: dLine, baseKey: 'stoch', sub: 'd' })
+        paneIndex++
       }
     }
 
@@ -333,17 +378,33 @@ export function ChartPanel({
     <div className="relative h-full min-h-0 w-full">
       <div ref={containerRef} className="absolute inset-0" />
       {chartReady && (
-        <DrawingOverlay
-          chartRef={chartRef}
-          seriesRef={seriesRef}
-          candles={candles}
-          drawings={drawingsHidden ? [] : drawings}
-          activeTool={activeTool}
-          pair={pair}
-          market={market}
-          onAdd={onAddDrawing}
-          onErase={onEraseDrawing}
-        />
+        <>
+          <DrawingOverlay
+            chartRef={chartRef}
+            seriesRef={seriesRef}
+            candles={candles}
+            drawings={drawingsHidden ? [] : drawings}
+            activeTool={activeTool}
+            pair={pair}
+            market={market}
+            onAdd={onAddDrawing}
+            onErase={onEraseDrawing}
+            onExecute={onExecutePositionDrawing}
+          />
+          <SlTpOverlay
+            chartRef={chartRef}
+            seriesRef={seriesRef}
+            positions={positions}
+            orders={orders}
+            draftSl={draftSl}
+            draftTp={draftTp}
+            currentPrice={currentPrice}
+            equity={equity}
+            pair={pair}
+            market={market}
+            onCommit={onSlTpCommit}
+          />
+        </>
       )}
     </div>
   )

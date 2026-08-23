@@ -19,6 +19,8 @@ import { DrawToolbar } from './DrawToolbar'
 import { IndicatorMenu } from './IndicatorMenu'
 import { AiChatPanel, AiChatPanelHeader } from './AiChatPanel'
 import type { DrawTool } from './DrawingOverlay'
+import type { SlTpPatch } from './SlTpOverlay'
+import { useOrderSizing } from './use-order-sizing'
 import { useReplayHotkeys } from './use-replay-hotkeys'
 import {
   useReplaySession,
@@ -26,6 +28,8 @@ import {
   type ResumeState,
 } from './use-replay-session'
 import type { Candle, DrawingShape } from '@/lib/types/replay'
+import { pipSize } from '@/lib/replay/execution'
+import { computeIndicators } from '@/lib/replay/indicators'
 import { endReplaySession } from '@/lib/actions/replay'
 
 interface ReplayWorkspaceProps {
@@ -40,6 +44,9 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
   const [mobileOpen, setMobileOpen] = useState(false)
   const [activeTool, setActiveTool] = useState<DrawTool | null>(null)
   const [showDrawings, setShowDrawings] = useState(true)
+  // Order-form draft levels (string form for the inputs; chart lines drag these too)
+  const [draftSl, setDraftSl] = useState('')
+  const [draftTp, setDraftTp] = useState('')
   const session = useReplaySession(config, candlesByTf, resume)
 
   function addDrawing(shape: DrawingShape) {
@@ -48,12 +55,103 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
   }
 
   const currentPrice = session.currentBar?.close ?? null
+  const sizing = useOrderSizing(config.pair, config.market, session.equity)
 
-  // Quick-trade hotkeys fire a 0.1-lot market order with no SL/TP; the trading
-  // panel remains the way to set sizing and levels precisely.
+  /** ATR(14) of the visible primary candles — null until enough bars exist */
+  function currentAtr(): number | null {
+    const values = computeIndicators(session.visibleCandles, [{ type: 'ATR', params: { period: 14 } }]).get('atr_14') as number[] | undefined
+    if (!values) return null
+    for (let i = values.length - 1; i >= 0; i--) {
+      if (Number.isFinite(values[i])) return values[i]
+    }
+    return null
+  }
+
+  /** ATR-based protective levels so a position is never left naked */
+  function atrLevels(side: 'buy' | 'sell', price: number): { sl: number | null; tp: number | null } {
+    const atr = currentAtr()
+    if (atr === null) return { sl: null, tp: null }
+    return side === 'buy'
+      ? { sl: price - 1.5 * atr, tp: price + 3 * atr }
+      : { sl: price + 1.5 * atr, tp: price - 3 * atr }
+  }
+
+  // Quick-trade hotkeys: market order with ATR-based protective levels.
+  // Sizing respects the trading panel's mode.
   function quickOrder(side: 'buy' | 'sell') {
-    session.placeMarket(side, 0.1, null, null)
-    toast.info(`Quick ${side.toUpperCase()} 0.1 ${config.pair}`)
+    if (currentPrice === null) return
+    const { sl, tp } = atrLevels(side, currentPrice)
+    const lots = sizing.effectiveLots(currentPrice, sl) ?? 0.1
+    session.placeMarket(side, lots, sl, tp)
+    toast.info(`Quick ${side.toUpperCase()} ${lots} ${config.pair}${sl !== null ? ' · ATR SL/TP set' : ''}`)
+  }
+
+  // Panel BUY/SELL: fill blank SL/TP fields with the same ATR defaults so the
+  // chart always has levels to draw knobs for.
+  function marketOrderWithDefaults(side: 'buy' | 'sell', lots: number, sl: number | null, tp: number | null) {
+    if (currentPrice === null) return
+    let outSl = sl
+    let outTp = tp
+    if (outSl === null || outTp === null) {
+      const d = atrLevels(side, currentPrice)
+      if (outSl === null) outSl = d.sl
+      if (outTp === null) outTp = d.tp
+    }
+    session.placeMarket(side, lots, outSl, outTp)
+    if (sl === null || tp === null) toast.info(`Blank SL/TP filled with ATR defaults · drag them on the chart`)
+  }
+
+  // Chart-drag commits: live positions/orders modify in place; draft lines feed
+  // the order-form inputs.
+  function handleSlTpCommit(patch: SlTpPatch) {
+    if (patch.kind === 'position') {
+      session.modifyPositionFields(patch.id, { [patch.field]: patch.value })
+    } else if (patch.kind === 'order') {
+      session.modifyOrderFields(patch.id, { [patch.field]: patch.value })
+    } else if (patch.field === 'sl') {
+      setDraftSl(String(patch.value))
+    } else {
+      setDraftTp(String(patch.value))
+    }
+  }
+
+  /** Execute a long/short position-plan drawing as a real order.
+   *  Entry within the spread → market order; otherwise pending limit/stop
+   *  at the drawn entry with the plan's SL/TP attached. */
+  function executePositionDrawing(shape: DrawingShape) {
+    if (currentPrice === null) return
+    const entry = shape.points[0].price
+    const sl = shape.points[1].price
+    const tp = shape.tpPrice ?? null
+    const side = shape.kind === 'long_position' ? ('buy' as const) : ('sell' as const)
+
+    const lots = sizing.effectiveLots(entry, sl)
+    if (lots === null) {
+      toast.error('Invalid lot size / risk settings in the trading panel.')
+      return
+    }
+
+    const halfSpread = pipSize(config.pair, config.market) * (config.spreadPips / 2)
+    const label = shape.kind === 'long_position' ? 'LONG' : 'SHORT'
+    const digits = config.market === 'crypto' ? 2 : config.pair.includes('JPY') ? 3 : 5
+
+    if (Math.abs(entry - currentPrice) <= halfSpread) {
+      session.placeMarket(side, lots, sl, tp)
+      toast.success(`Executed ${label} ${lots} @ ~${currentPrice.toFixed(digits)} · SL/TP from plan`)
+      return
+    }
+
+    // Pending: limit fills toward price, stop away from it
+    const wantsBelow = side === 'buy' ? entry < currentPrice : entry > currentPrice
+    session.placePending({
+      type: wantsBelow ? 'limit' : 'stop',
+      side,
+      price: entry,
+      lotSize: lots,
+      stopLoss: sl,
+      takeProfit: tp,
+    })
+    toast.success(`${label.toUpperCase()} ${wantsBelow ? 'limit' : 'stop'} placed @ ${entry.toFixed(digits)} · SL/TP attached`)
   }
 
   useReplayHotkeys({
@@ -114,9 +212,17 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
       pair={config.pair}
       market={config.market}
       currentPrice={currentPrice}
-      equity={session.equity}
-      onMarketOrder={session.placeMarket}
-      onPendingOrder={session.placePending}
+      openPositions={session.state.positions.length}
+      sizing={sizing}
+      slValue={draftSl}
+      tpValue={draftTp}
+      onSlChange={setDraftSl}
+      onTpChange={setDraftTp}
+      onMarketOrder={marketOrderWithDefaults}
+      onCloseAll={() => {
+        for (const p of session.state.positions) session.closePositionFull(p.id)
+        if (session.state.positions.length > 0) toast.info('Closed all positions')
+      }}
     />
   )
 
@@ -189,8 +295,16 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
             drawingsHidden={!showDrawings}
             activeTool={activeTool}
             indicatorConfigs={session.state.indicatorConfigs}
+            positions={session.state.positions}
+            orders={session.state.orders}
+            draftSl={draftSl === '' ? null : parseFloat(draftSl) || null}
+            draftTp={draftTp === '' ? null : parseFloat(draftTp) || null}
+            currentPrice={currentPrice}
+            equity={session.equity}
             onAddDrawing={addDrawing}
             onEraseDrawing={(id) => session.setDrawings(session.state.drawings.filter((d) => d.id !== id))}
+            onExecutePositionDrawing={executePositionDrawing}
+            onSlTpCommit={handleSlTpCommit}
           />
           <DrawToolbar
             activeTool={activeTool}

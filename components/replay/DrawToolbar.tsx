@@ -3,17 +3,26 @@
 // Vertical drawing-tool strip on the chart's left edge + indicator menu trigger.
 
 import {
+  ArrowUpRight,
   Eraser,
+  Equal,
   Eye,
   EyeOff,
+  GitFork,
   Minus,
   MousePointer2,
+  MoveHorizontal,
+  MoveUpRight,
+  MoveVertical,
   PenLine,
   Percent,
   Ruler,
+  Scaling,
   SeparatorVertical,
   Square,
   Trash2,
+  TrendingDown,
+  TrendingUp,
   Type,
 } from 'lucide-react'
 import type { DrawTool } from './DrawingOverlay'
@@ -28,14 +37,23 @@ interface DrawToolbarProps {
 }
 
 const TOOLS: { tool: DrawTool; label: string; icon: React.ReactNode }[] = [
+  { tool: 'long_position', label: 'Long position plan', icon: <TrendingUp className="h-4 w-4" /> },
+  { tool: 'short_position', label: 'Short position plan', icon: <TrendingDown className="h-4 w-4" /> },
   { tool: 'hline', label: 'Horizontal line', icon: <Minus className="h-4 w-4" /> },
   { tool: 'vline', label: 'Vertical line', icon: <SeparatorVertical className="h-4 w-4" /> },
+  { tool: 'hray', label: 'Horizontal ray', icon: <MoveHorizontal className="h-4 w-4" /> },
+  { tool: 'vray', label: 'Vertical ray', icon: <MoveVertical className="h-4 w-4" /> },
+  { tool: 'ray', label: 'Ray', icon: <MoveUpRight className="h-4 w-4" /> },
+  { tool: 'arrow', label: 'Arrow', icon: <ArrowUpRight className="h-4 w-4" /> },
   { tool: 'trendline', label: 'Trendline', icon: <PenLine className="h-4 w-4" /> },
+  { tool: 'channel', label: 'Channel (3 clicks)', icon: <Equal className="h-4 w-4" /> },
+  { tool: 'pitchfork', label: 'Pitchfork (3 clicks)', icon: <GitFork className="h-4 w-4" /> },
   { tool: 'rect', label: 'Zone (rectangle)', icon: <Square className="h-4 w-4" /> },
+  { tool: 'price_range', label: 'Price range', icon: <Scaling className="h-4 w-4" /> },
   { tool: 'fib', label: 'Fib retracement', icon: <Percent className="h-4 w-4" /> },
-  { tool: 'text', label: 'Text note', icon: <Type className="h-4 w-4" /> },
   { tool: 'measure', label: 'Measure pips/bars', icon: <Ruler className="h-4 w-4" /> },
-  { tool: 'eraser', label: 'Eraser', icon: <Eraser className="h-4 w-4" /> },
+  { tool: 'text', label: 'Text note', icon: <Type className="h-4 w-4" /> },
+  { tool: 'eraser', label: 'Eraser — tap a drawing to delete it', icon: <Eraser className="h-4 w-4" /> },
 ]
 
 export function DrawToolbar({

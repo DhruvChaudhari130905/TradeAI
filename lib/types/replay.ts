@@ -126,7 +126,12 @@ export interface ClosedReplayTrade {
 
 // ── Drawings ──────────────────────────────────────────────────────────────────
 
-export type DrawingKind = 'hline' | 'vline' | 'trendline' | 'rect' | 'fib' | 'text' | 'measure'
+export type DrawingKind =
+  | 'hline' | 'vline' | 'trendline' | 'rect' | 'fib' | 'text' | 'measure'
+  // rays extend beyond their second anchor; channel/pitchfork take 3 anchors
+  | 'hray' | 'vray' | 'ray' | 'arrow' | 'channel' | 'price_range' | 'pitchfork'
+  // position planners: points[0]=entry, points[1]=SL corner; tpPrice on shape
+  | 'long_position' | 'short_position'
 
 export interface DrawingPoint {
   time: string   // ISO date string of the anchor candle
@@ -136,14 +141,17 @@ export interface DrawingPoint {
 export interface DrawingShape {
   id: string
   kind: DrawingKind
-  points: DrawingPoint[]     // 1 for hline/vline/text, 2 for the rest
+  points: DrawingPoint[]     // 1 for hline/vline/vray/hray/text, 2 otherwise, 3 for channel/pitchfork
   color?: string
   label?: string             // text tool content; measure caches its readout
+  tpPrice?: number           // position tools: take-profit level (points[1].price is SL)
 }
 
 // ── Indicators (chart overlays) ───────────────────────────────────────────────
 
-export type OverlayIndicatorType = 'EMA' | 'SMA' | 'BBANDS' | 'RSI' | 'MACD'
+export type OverlayIndicatorType =
+  | 'EMA' | 'SMA' | 'BBANDS' | 'RSI' | 'MACD'
+  | 'ATR' | 'STOCH' | 'ADX' | 'VWAP'
 
 export interface ReplayIndicatorConfig {
   id: string

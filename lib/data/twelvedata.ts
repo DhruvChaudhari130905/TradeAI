@@ -67,12 +67,19 @@ export async function fetchTimeSeries(params: FetchTimeSeriesParams): Promise<Ca
 
   await acquireToken()
 
+  // Non-2xx responses still carry TD's error JSON (e.g. "No data is
+  // available on the specified dates" arrives as HTTP 400) — parse first,
+  // then decide.
   const response = await fetchWithRetry(url.toString())
 
   const data = await response.json()
 
   if (data.status === 'error') {
     throw new Error(`Twelve Data API error: ${data.message ?? 'Unknown error'}`)
+  }
+
+  if (!response.ok) {
+    throw new Error(`Twelve Data request failed: ${response.status} ${response.statusText}`)
   }
 
   const values = data.values as Array<Record<string, string>> | undefined
@@ -166,10 +173,8 @@ async function fetchWithRetry(url: string, maxRetries = 3): Promise<Response> {
       throw new Error('Twelve Data rate limit exceeded after retries. Try again later.')
     }
 
-    if (!response.ok) {
-      throw new Error(`Twelve Data request failed: ${response.status} ${response.statusText}`)
-    }
-
+    // Non-429 errors (e.g. 400 "no data on these dates") are returned as-is —
+    // the caller parses TD's error JSON for the real message.
     return response
   }
 

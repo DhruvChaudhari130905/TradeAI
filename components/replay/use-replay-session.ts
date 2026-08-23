@@ -18,6 +18,7 @@ import type {
 } from '@/lib/types/replay'
 import {
   closeLots,
+  modifyOrder as simModifyOrder,
   modifyPosition,
   newId,
   openMarketPosition,
@@ -121,10 +122,14 @@ export function useReplaySession(
     })
   }, [])
 
-  /** Journal insert for a newly fully-closed trade; stamps the returned id */
+  /** Journal insert for a newly fully-closed trade; stamps the returned id.
+   *  Deferred past the current render: callers invoke this inside setState
+   *  updaters, and the action's revalidatePath must not touch the router
+   *  mid-render. */
   const recordToJournal = useCallback(
     (trade: ClosedReplayTrade) => {
-      void (async () => {
+      setTimeout(() => {
+        void (async () => {
         try {
           const res = await recordClosedTrade({
             sessionId: config.id,
@@ -149,11 +154,12 @@ export function useReplaySession(
               ),
             }))
           }
-        } catch {
-          // Journal insert failure must not break replay; autosave keeps the
-          // trade in closed_trades so it can be re-recorded later.
-        }
-      })()
+          } catch {
+            // Journal insert failure must not break replay; autosave keeps the
+            // trade in closed_trades so it can be re-recorded later.
+          }
+        })()
+      }, 0)
     },
     [config],
   )
@@ -234,6 +240,13 @@ export function useReplaySession(
   const modifyPositionFields = useCallback(
     (positionId: string, patch: Partial<Pick<ReplayPosition, 'stopLoss' | 'takeProfit' | 'trailingStopPips' | 'breakEvenMoved'>>) => {
       setState((prev) => ({ ...prev, ...modifyPosition(prev, positionId, patch) }))
+    },
+    [],
+  )
+
+  const modifyOrderFields = useCallback(
+    (orderId: string, patch: Partial<Pick<PendingOrder, 'stopLoss' | 'takeProfit' | 'price'>>) => {
+      setState((prev) => ({ ...prev, ...simModifyOrder(prev, orderId, patch) }))
     },
     [],
   )
@@ -366,6 +379,7 @@ export function useReplaySession(
     placePending,
     cancelOrder,
     modifyPositionFields,
+    modifyOrderFields,
     closePositionFull,
     partialClosePosition,
     setDrawings,

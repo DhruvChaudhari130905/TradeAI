@@ -1,7 +1,8 @@
 'use client'
 
-// Indicator management popover: add/remove EMA, SMA, BBANDS (price pane) and
-// RSI, MACD (sub-panes), edit periods. Configs persist via session autosave.
+// Indicator management popover: add/remove any engine indicator (overlays on
+// the price pane or sub-panes), multiple instances with per-instance params.
+// Configs persist via session autosave.
 
 import { useState } from 'react'
 import { ChartLine, Eye, EyeOff, Plus, X } from 'lucide-react'
@@ -22,6 +23,10 @@ const LABELS: Record<OverlayIndicatorType, string> = {
   BBANDS: 'Bollinger Bands',
   RSI: 'RSI',
   MACD: 'MACD',
+  ATR: 'ATR',
+  STOCH: 'Stochastic',
+  ADX: 'ADX',
+  VWAP: 'VWAP',
 }
 
 function defaultParams(type: OverlayIndicatorType): Record<string, number> {
@@ -35,6 +40,13 @@ function defaultParams(type: OverlayIndicatorType): Record<string, number> {
       return { period: 14 }
     case 'MACD':
       return { fast: 12, slow: 26, signal: 9 }
+    case 'ATR':
+    case 'ADX':
+      return { period: 14 }
+    case 'STOCH':
+      return { k_period: 14, d_period: 3 }
+    case 'VWAP':
+      return {}
   }
 }
 
@@ -45,6 +57,9 @@ export function indicatorLabel(cfg: ReplayIndicatorConfig): string {
   }
   if (cfg.type === 'BBANDS') {
     return `BB ${cfg.params.period ?? 20},${cfg.params.std_dev ?? 2}`
+  }
+  if (cfg.type === 'STOCH') {
+    return `Stoch ${cfg.params.k_period ?? 14},${cfg.params.d_period ?? 3}`
   }
   return `${cfg.type} ${cfg.params.period ?? ''}`.trim()
 }
@@ -62,14 +77,20 @@ const NUM_FIELDS: Record<OverlayIndicatorType, { key: string; label: string }[]>
     { key: 'slow', label: 'Slow' },
     { key: 'signal', label: 'Signal' },
   ],
+  ATR: [{ key: 'period', label: 'Period' }],
+  ADX: [{ key: 'period', label: 'Period' }],
+  STOCH: [
+    { key: 'k_period', label: '%K period' },
+    { key: 'd_period', label: '%D period' },
+  ],
+  VWAP: [],
 }
 
 export function IndicatorMenu({ configs, onChange }: IndicatorMenuProps) {
   const [open, setOpen] = useState(false)
 
   function addIndicator(type: OverlayIndicatorType) {
-    // One instance per type — editing params beats juggling duplicates
-    if (configs.some((c) => c.type === type)) return
+    // Duplicates allowed (EMA 20 + EMA 50); each instance gets its own params
     onChange([...configs, { id: newId(), type, visible: true, params: defaultParams(type) }])
   }
 
@@ -86,7 +107,7 @@ export function IndicatorMenu({ configs, onChange }: IndicatorMenuProps) {
     )
   }
 
-  const available = (Object.keys(LABELS) as OverlayIndicatorType[]).filter((t) => !configs.some((c) => c.type === t))
+  const available = Object.keys(LABELS) as OverlayIndicatorType[]
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -111,7 +132,7 @@ export function IndicatorMenu({ configs, onChange }: IndicatorMenuProps) {
           {configs.map((cfg) => (
             <div key={cfg.id} className="rounded-md border border-[#27272A] bg-[#1C1E26] p-2">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-medium">{LABELS[cfg.type]}</span>
+                <span className="font-mono text-xs font-medium">{indicatorLabel(cfg)}</span>
                 <button
                   type="button"
                   title={cfg.visible ? 'Hide' : 'Show'}

@@ -110,6 +110,17 @@ export function cancelOrder(state: SimState, orderId: string): SimState {
   return { ...state, orders: state.orders.filter((o) => o.id !== orderId) }
 }
 
+export function modifyOrder(
+  state: SimState,
+  orderId: string,
+  patch: Partial<Pick<PendingOrder, 'stopLoss' | 'takeProfit' | 'price'>>,
+): SimState {
+  return {
+    ...state,
+    orders: state.orders.map((o) => (o.id === orderId ? { ...o, ...patch } : o)),
+  }
+}
+
 export function modifyPosition(
   state: SimState,
   positionId: string,
