@@ -39,6 +39,13 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ['172.20.10.3'],
+  // saveSessionCandles ships cached OHLCV (multi-timeframe) through a
+  // Server Action — well past the 1MB default.
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '10mb',
+    },
+  },
   // pdfjs-dist must NOT be bundled — it loads a worker file via a
   // relative path that only resolves correctly in node_modules.
   serverExternalPackages: ['pdfjs-dist', 'pdf-parse-fork'],
