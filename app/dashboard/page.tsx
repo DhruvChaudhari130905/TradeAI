@@ -90,6 +90,8 @@ export default function DashboardPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [period, setPeriod] = useState<TimePeriod>('all')
+  // Real (journal) vs backtested — null source counts as live (legacy manual logs)
+  const [sourceTab, setSourceTab] = useState<'live' | 'backtest'>('live')
 
   // ── Fetch all data ──
   const fetchData = useCallback(async (isRefresh = false) => {
@@ -133,16 +135,19 @@ export default function DashboardPage() {
     fetchData()
   }, [fetchData])
 
-  // ── Filter trades by time period ──
+  // ── Filter trades by source + time period ──
   const filteredTrades = useMemo(() => {
-    if (period === 'all') return allTrades
+    const bySource = allTrades.filter(
+      (t) => (t.source ?? 'live') === sourceTab,
+    )
+    if (period === 'all') return bySource
     const days = period === '7d' ? 7 : period === '30d' ? 30 : 90
     const cutoff = daysAgo(days)
-    return allTrades.filter((t) => {
+    return bySource.filter((t) => {
       if (!t.entry_time) return false
       return new Date(t.entry_time) >= cutoff
     })
-  }, [allTrades, period])
+  }, [allTrades, period, sourceTab])
 
   // ── Compute stats from filtered trades ──
   const stats = useMemo<DashboardStats>(() => {
@@ -234,6 +239,23 @@ export default function DashboardPage() {
         {/* Refresh + Period Filter */}
         {!isEmpty && (
           <div className="flex flex-wrap items-center gap-2">
+            {/* Real vs backtested toggle */}
+            <div className="flex items-center gap-1 rounded-lg border border-zinc-800 bg-[#12141A] p-1">
+              {(['live', 'backtest'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setSourceTab(tab)}
+                  className={`rounded-md px-2.5 py-1 text-xs font-medium capitalize transition-colors ${
+                    sourceTab === tab
+                      ? 'bg-[#00FF9C]/15 text-[#00FF9C]'
+                      : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  {tab === 'live' ? 'Real' : 'Backtested'}
+                </button>
+              ))}
+            </div>
+
             {/* Time period pills */}
             <div className="flex flex-wrap items-center gap-1 rounded-lg border border-zinc-800 bg-[#12141A] p-1">
               <CalendarDays className="ml-2 h-3.5 w-3.5 text-zinc-500" />
@@ -300,14 +322,18 @@ export default function DashboardPage() {
       ) : (
         <>
           {/* ── Period Empty State ── */}
-          {!hasFilteredResults && period !== 'all' ? (
+          {!hasFilteredResults ? (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-zinc-800 bg-[#12141A] py-16 px-6">
               <CalendarDays className="h-10 w-10 text-zinc-600 mb-4" />
-              <h3 className="text-sm font-semibold text-white">No trades in this period</h3>
+              <h3 className="text-sm font-semibold text-white">
+                No {sourceTab === 'live' ? 'real' : 'backtested'} trades{period !== 'all' ? ' in this period' : ''}
+              </h3>
               <p className="mt-1 text-sm text-zinc-500">
-                You have {allTrades.length} trade{allTrades.length !== 1 ? 's' : ''} total, but none fall within the last {
-                  period === '7d' ? '7 days' : period === '30d' ? '30 days' : '90 days'
-                }.
+                {period !== 'all'
+                  ? `None of your ${sourceTab === 'live' ? 'real' : 'backtested'} trades fall within the last ${
+                      period === '7d' ? '7 days' : period === '30d' ? '30 days' : '90 days'
+                    }.`
+                  : `Log ${sourceTab === 'live' ? 'a trade in the journal' : 'a backtest'} to see its stats here.`}
               </p>
               <Button
                 variant="ghost"

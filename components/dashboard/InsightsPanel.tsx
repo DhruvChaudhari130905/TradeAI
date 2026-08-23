@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
-import { Lightbulb, Clock, Loader2, TrendingUp, Target, AlertTriangle } from 'lucide-react'
+import { Lightbulb, Clock, Loader2, RefreshCw, TrendingUp, Target, AlertTriangle } from 'lucide-react'
 
 interface Insight {
   title: string
@@ -31,24 +31,36 @@ export function InsightsPanel({ tradeCount }: InsightsPanelProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const [refreshing, setRefreshing] = useState(false)
+
+  async function fetchInsights(refresh = false) {
+    if (refresh) setRefreshing(true)
+    setLoading(true)
+    try {
+      const res = await fetch('/api/insights', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        throw new Error(body?.error ?? `HTTP ${res.status}`)
+      }
+      const data = await res.json()
+      setInsights(data.insights ?? [])
+    } catch (err) {
+      console.error('[InsightsPanel]', err)
+      setError(`Could not load insights${err instanceof Error && err.message ? ` (${err.message})` : ''}`)
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }
+
   useEffect(() => {
     if (tradeCount < 5) return
-
-    async function fetchInsights() {
-      setLoading(true)
-      try {
-        const res = await fetch('/api/insights', { method: 'POST' })
-        if (!res.ok) throw new Error('Failed to fetch insights')
-        const data = await res.json()
-        setInsights(data.insights ?? [])
-      } catch (err) {
-        console.error('[InsightsPanel]', err)
-        setError('Could not load insights')
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchInsights()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchInsights()
   }, [tradeCount])
 
   if (tradeCount < 5) {
@@ -75,9 +87,17 @@ export function InsightsPanel({ tradeCount }: InsightsPanelProps) {
   return (
     <Card className="border-zinc-800 bg-[#12141A]">
       <CardContent className="p-6">
-        <div className="flex items-center gap-2 mb-4">
+        <div className="mb-4 flex items-center gap-2">
           <Lightbulb className="h-4 w-4 text-[#F59E0B]" />
           <h3 className="text-sm font-semibold text-white">AI Insights</h3>
+          <button
+            onClick={() => void fetchInsights(true)}
+            disabled={loading}
+            title="Generate fresh analysis"
+            className="ml-auto flex h-7 w-7 items-center justify-center rounded-md border border-zinc-800 bg-[#0A0B0E] text-zinc-400 transition-colors hover:border-zinc-700 hover:text-[#00FF9C] disabled:opacity-40"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
         </div>
 
         {loading ? (
@@ -86,7 +106,19 @@ export function InsightsPanel({ tradeCount }: InsightsPanelProps) {
             <span className="text-sm">Analyzing your trades…</span>
           </div>
         ) : error ? (
-          <p className="py-4 text-sm text-zinc-500 text-center">{error}</p>
+          <div className="py-4 text-center">
+            <p className="text-sm text-zinc-500">{error}</p>
+            <button
+              onClick={() => void fetchInsights(true)}
+              className="mt-2 text-xs text-[#00FF9C] hover:text-[#00FF9C]/80"
+            >
+              Try again
+            </button>
+          </div>
+        ) : insights.length === 0 ? (
+          <p className="py-4 text-sm text-center text-zinc-500">
+            No insights yet — hit refresh to analyze your trades.
+          </p>
         ) : (
           <div className="space-y-3">
             {insights.map((insight, i) => {

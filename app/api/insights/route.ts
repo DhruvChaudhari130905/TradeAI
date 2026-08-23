@@ -4,8 +4,17 @@ import { getNimClient, NIM_MODEL, NIM_FALLBACK_MODEL } from '@/lib/nim/client'
 import { parseNimJson } from '@/lib/nim/parse-nim-json'
 import { INSIGHTS_SYSTEM_PROMPT } from '@/lib/prompts/insights-system-prompt'
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
+    // `{ refresh: true }` in the body skips the 24h cache and regenerates
+    let refresh = false
+    try {
+      const body = (await request.json()) as { refresh?: boolean }
+      refresh = body?.refresh === true
+    } catch {
+      // no body — cache path
+    }
+
     const supabase = await createClient()
     const {
       data: { user },
@@ -16,13 +25,17 @@ export async function POST() {
     }
 
     // Check cache first (24h TTL)
-    const { data: cached } = await supabase
-      .from('dashboard_insights')
-      .select('insights, created_at')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
+    let cached: { insights: unknown[]; created_at: string } | null = null
+    if (!refresh) {
+      const { data } = await supabase
+        .from('dashboard_insights')
+        .select('insights, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+      cached = data
+    }
 
     if (cached) {
       const cacheAge = Date.now() - new Date(cached.created_at).getTime()
@@ -71,7 +84,7 @@ export async function POST() {
           { role: 'user', content: `Here are my recent trades:\n${tradeContext}` },
         ],
         temperature: 0.4,
-        max_tokens: 600,
+        max_tokens: 2048,
       })
 
       const content = response.choices[0]?.message?.content?.trim() ?? '[]'
@@ -86,7 +99,7 @@ export async function POST() {
             { role: 'user', content: `Here are my recent trades:\n${tradeContext}` },
           ],
           temperature: 0.4,
-          max_tokens: 600,
+          max_tokens: 2048,
         })
 
         const content = response.choices[0]?.message?.content?.trim() ?? '[]'
