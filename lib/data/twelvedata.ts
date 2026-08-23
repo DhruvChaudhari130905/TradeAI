@@ -2,14 +2,16 @@ import type { Candle } from '@/lib/types/replay'
 import { TF_TO_TWELVE_DATA, type Timeframe } from '@/lib/types/replay'
 
 // ── Rate Limiter (8 credits/min, 800/day) ────────────────────────────────────
-// Strict pacing instead of a token bucket: a burst of 8 requests in 2 seconds
-// can straddle Twelve Data's rolling minute window and still trip the limit.
-// Spacing every request ≥8s apart guarantees we stay under 8/min.
+// Rolling 60s window matching Twelve Data's own counting: a fresh burst of
+// requests goes out immediately (fast first paint), further requests wait for
+// oldest-window slots to free up. One slot held back as margin against
+// boundary-straddle 429s.
 
-const MIN_REQUEST_GAP_MS = 8_000 // 60s / 8 credits, with margin
+const WINDOW_MS = 60_000
+const MAX_PER_WINDOW = 7 // 8 credits minus safety margin
 const DAILY_LIMIT = 800
 
-let lastRequestAt = 0
+let requestTimes: number[] = []
 let dailyUsage = 0
 let dailyResetDay = new Date().getDate()
 
@@ -25,11 +27,14 @@ async function acquireToken(): Promise<void> {
     throw new Error('Twelve Data daily API limit approaching. Try again tomorrow.')
   }
 
-  const waitMs = lastRequestAt + MIN_REQUEST_GAP_MS - Date.now()
-  if (waitMs > 0) {
-    await sleep(waitMs)
+  for (;;) {
+    const now = Date.now()
+    requestTimes = requestTimes.filter((t) => now - t < WINDOW_MS)
+    if (requestTimes.length < MAX_PER_WINDOW) break
+    // Sleep until the oldest request leaves the window
+    await sleep(requestTimes[0] + WINDOW_MS - now + 100)
   }
-  lastRequestAt = Date.now()
+  requestTimes.push(Date.now())
   dailyUsage += 1
 }
 
