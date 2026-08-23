@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { TIMEFRAMES } from '@/lib/types/replay'
 import type {
+  Candle,
   ChatMessage,
   ClosedReplayTrade,
   DrawingShape,
@@ -218,9 +219,11 @@ export async function getReplaySession(
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { success: false, error: 'Not authenticated' }
 
+    // Explicit column list — excludes the heavy `candles` jsonb, which is
+    // loaded separately via getSessionCandles only when needed
     const { data, error } = await supabase
       .from('replay_sessions')
-      .select('*')
+      .select(SESSION_COLUMNS)
       .eq('id', sessionId)
       .single()
 
@@ -229,6 +232,70 @@ export async function getReplaySession(
   } catch (error) {
     console.error('[getReplaySession]', error)
     return { success: false, error: 'Failed to load session.' }
+  }
+}
+
+// ── Candle cache ──────────────────────────────────────────────────────────────
+// Fetched OHLCV is stored once on the session row so resuming a paused
+// session makes zero Twelve Data calls.
+
+// Explicit column list — excludes the heavy `candles` jsonb, which is loaded
+// separately via getSessionCandles only when needed
+const SESSION_COLUMNS =
+  'id, user_id, pair, market, timeframes, date_from, date_to, starting_balance, leverage, spread_pips, status, cursor_index, balance, positions, orders, drawings, indicator_configs, closed_trades, equity_curve, chat_messages, personality_reviews, created_at, updated_at'
+
+export async function getSessionCandles(
+  sessionId: string,
+): Promise<ActionResult<Record<string, Candle[]> | null>> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Not authenticated' }
+
+    const { data, error } = await supabase
+      .from('replay_sessions')
+      .select('candles')
+      .eq('id', sessionId)
+      .single()
+
+    if (error) return { success: false, error: 'Session not found' }
+    return { success: true, data: (data.candles as Record<string, Candle[]> | null) ?? null }
+  } catch (error) {
+    console.error('[getSessionCandles]', error)
+    return { success: false, error: 'Failed to load cached candles.' }
+  }
+}
+
+const saveCandlesSchema = z.object({
+  sessionId: z.string().uuid(),
+  candles: z.record(z.string(), z.array(z.custom<Candle>())),
+})
+
+/** Write-once: saves only if the column is still null (first fetch wins). */
+export async function saveSessionCandles(
+  input: unknown,
+): Promise<ActionResult<{ saved: boolean }>> {
+  const parsed = saveCandlesSchema.safeParse(input)
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' }
+  }
+
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Not authenticated' }
+
+    const { count, error } = await supabase
+      .from('replay_sessions')
+      .update({ candles: parsed.data.candles })
+      .eq('id', parsed.data.sessionId)
+      .is('candles', null)
+
+    if (error) throw error
+    return { success: true, data: { saved: (count ?? 0) > 0 } }
+  } catch (error) {
+    console.error('[saveSessionCandles]', error)
+    return { success: false, error: 'Failed to cache candles.' }
   }
 }
 

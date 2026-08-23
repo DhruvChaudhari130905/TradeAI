@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
 import { ReplayWorkspace } from '@/components/replay/ReplayWorkspace'
 import type { ResumeState, ReplaySessionConfig } from '@/components/replay/use-replay-session'
-import { getReplaySession } from '@/lib/actions/replay'
+import { getReplaySession, getSessionCandles, saveSessionCandles } from '@/lib/actions/replay'
 import type { Candle, Timeframe } from '@/lib/types/replay'
 
 interface SessionData {
@@ -38,14 +38,24 @@ export default function ReplaySessionPage({ params }: { params: Promise<{ id: st
           return
         }
 
-        const candlesRes = await fetch(`/api/replay/${id}/candles`)
-        if (!candlesRes.ok) {
-          const body = await candlesRes.json().catch(() => null)
-          if (!cancelled) setError(body?.error ?? 'Failed to fetch historical data.')
-          return
-        }
-        const body = (await candlesRes.json()) as {
-          candles: Record<string, Candle[]>
+        // Cached candles from a previous load mean zero Twelve Data calls on resume
+        const cached = await getSessionCandles(id)
+        let candlesByTf: Record<string, Candle[]> | null =
+          cached.success ? cached.data : null
+
+        if (!candlesByTf) {
+          const candlesRes = await fetch(`/api/replay/${id}/candles`)
+          if (!candlesRes.ok) {
+            const body = await candlesRes.json().catch(() => null)
+            if (!cancelled) setError(body?.error ?? 'Failed to fetch historical data.')
+            return
+          }
+          const body = (await candlesRes.json()) as {
+            candles: Record<string, Candle[]>
+          }
+          candlesByTf = body.candles
+          // Fire-and-forget: persist so the next resume skips the API entirely
+          void saveSessionCandles({ sessionId: id, candles: candlesByTf })
         }
 
         if (cancelled) return
@@ -79,7 +89,7 @@ export default function ReplaySessionPage({ params }: { params: Promise<{ id: st
                 }
               : null,
         })
-        setCandles(body.candles)
+        setCandles(candlesByTf)
       } catch (err) {
         console.error('[ReplaySessionPage]', err)
         if (!cancelled) setError('Failed to load session.')

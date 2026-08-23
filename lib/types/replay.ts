@@ -66,6 +66,8 @@ export interface ReplaySessionRow {
   equity_curve: EquityPoint[]
   chat_messages: ChatMessage[]
   personality_reviews: PersonalityReviewSet | null
+  /** Cached OHLCV per timeframe — written once after first fetch, null until then */
+  candles: Record<string, Candle[]> | null
   created_at: string
   updated_at: string
 }
