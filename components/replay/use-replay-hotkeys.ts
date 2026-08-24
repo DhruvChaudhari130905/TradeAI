@@ -1,7 +1,8 @@
 'use client'
 
 // Global replay hotkeys. Ignored while typing in inputs/textareas/selects or
-// contenteditable elements.
+// contenteditable elements. Trade keys (B/S/C) are gated behind an explicit
+// arm toggle so a stray keypress can never move capital uninvited.
 
 import { useEffect, useRef } from 'react'
 
@@ -10,8 +11,9 @@ export interface ReplayHotkeyHandlers {
   onStep: () => void
   onBuy?: () => void
   onSell?: () => void
-  onClosePosition?: () => void
+  onCloseAll?: () => void
   onCancel?: () => void
+  onToggleHotkeyHelp?: () => void
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -25,8 +27,9 @@ function isTypingTarget(target: EventTarget | null): boolean {
   )
 }
 
-export function useReplayHotkeys(handlers: ReplayHotkeyHandlers) {
+export function useReplayHotkeys(handlers: ReplayHotkeyHandlers, tradeKeysArmed: boolean) {
   const ref = useRefLatest(handlers)
+  const armedRef = useRefLatest(tradeKeysArmed)
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -43,28 +46,31 @@ export function useReplayHotkeys(handlers: ReplayHotkeyHandlers) {
           break
         case 'b':
         case 'B':
-          ref.current.onBuy?.()
+          if (armedRef.current) ref.current.onBuy?.()
           break
         case 's':
         case 'S':
-          ref.current.onSell?.()
+          if (armedRef.current) ref.current.onSell?.()
           break
         case 'c':
         case 'C':
-          ref.current.onClosePosition?.()
+          if (armedRef.current) ref.current.onCloseAll?.()
           break
         case 'Escape':
           ref.current.onCancel?.()
+          break
+        case '?':
+          ref.current.onToggleHotkeyHelp?.()
           break
       }
     }
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [ref])
+  }, [ref, armedRef])
 }
 
-/** Ref that always holds the latest handlers without re-subscribing the listener */
+/** Ref that always holds the latest value without re-subscribing listeners */
 function useRefLatest<T>(value: T) {
   const ref = useRef(value)
   useEffect(() => {

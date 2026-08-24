@@ -24,6 +24,8 @@ interface PositionsPanelProps {
   onPartialClose: (id: string, lots: number) => void
   onModifyPosition: (id: string, patch: Partial<Pick<ReplayPosition, 'stopLoss' | 'takeProfit' | 'trailingStopPips' | 'breakEvenMoved'>>) => void
   onCancelOrder: (id: string) => void
+  /** 44px touch targets for the mobile bottom-sheet context */
+  largeTargets?: boolean
 }
 
 export function PositionsPanel({
@@ -36,6 +38,7 @@ export function PositionsPanel({
   onPartialClose,
   onModifyPosition,
   onCancelOrder,
+  largeTargets = false,
 }: PositionsPanelProps) {
   if (positions.length === 0 && orders.length === 0) {
     return <p className="py-4 text-center text-xs text-zinc-600">No open positions or orders</p>
@@ -53,6 +56,7 @@ export function PositionsPanel({
           onClose={onClosePosition}
           onPartialClose={onPartialClose}
           onModify={onModifyPosition}
+          largeTargets={largeTargets}
         />
       ))}
       {orders.map((o) => (
@@ -61,7 +65,13 @@ export function PositionsPanel({
           <span className={`font-mono text-xs ${o.side === 'buy' ? 'text-[#00FF9C]' : 'text-[#FF4D4D]'}`}>
             {o.side.toUpperCase()} {o.lotSize} @ {o.price}
           </span>
-          <button onClick={() => onCancelOrder(o.id)} className="ml-auto text-zinc-500 hover:text-[#FF4D4D]" title="Cancel order">
+          <button
+            onClick={() => onCancelOrder(o.id)}
+            aria-label={`Cancel ${o.side} ${o.type} order at ${o.price}`}
+            className={`ml-auto flex items-center justify-center rounded text-zinc-500 hover:bg-[#FF4D4D]/10 hover:text-[#FF4D4D] ${
+              largeTargets ? 'h-11 w-11' : 'h-7 w-7'
+            }`}
+          >
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -78,6 +88,7 @@ function PositionRow({
   onClose,
   onPartialClose,
   onModify,
+  largeTargets,
 }: {
   position: ReplayPosition
   pair: string
@@ -86,6 +97,7 @@ function PositionRow({
   onClose: (id: string) => void
   onPartialClose: (id: string, lots: number) => void
   onModify: (id: string, patch: Partial<Pick<ReplayPosition, 'stopLoss' | 'takeProfit' | 'trailingStopPips' | 'breakEvenMoved'>>) => void
+  largeTargets: boolean
 }) {
   const [partialOpen, setPartialOpen] = useState(false)
   const pnl = currentPrice !== null ? floatingPnl(position, currentPrice, pair, market) : 0
@@ -122,7 +134,13 @@ function PositionRow({
         <span className={`ml-auto font-mono text-xs font-bold ${pnl >= 0 ? 'text-[#00FF9C]' : 'text-[#FF4D4D]'}`}>
           {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}
         </span>
-        <button onClick={() => onClose(position.id)} className="text-zinc-500 hover:text-[#FF4D4D]" title="Close position">
+        <button
+          onClick={() => onClose(position.id)}
+          aria-label={`Close ${position.direction} ${position.lotSize} lots at ${position.entryPrice}`}
+          className={`flex items-center justify-center rounded text-zinc-500 hover:bg-[#FF4D4D]/10 hover:text-[#FF4D4D] ${
+            largeTargets ? 'h-11 w-11' : 'h-7 w-7'
+          }`}
+        >
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
@@ -138,14 +156,15 @@ function PositionRow({
 
       <div className="mt-1.5 flex items-center gap-1.5">
         {/* Modify SL/TP dialog */}
-        <ModifyDialog position={position} digits={digits} onModify={onModify} />
+        <ModifyDialog position={position} digits={digits} onModify={onModify} largeTargets={largeTargets} />
 
         <Button size="sm" variant="outline" onClick={moveBreakeven} disabled={position.breakEvenMoved}
-          className="h-6 border-[#27272A] px-2 text-[10px]">
+          aria-label="Move stop loss to entry (breakeven)"
+          className={`${largeTargets ? 'h-11 px-3 text-xs' : 'h-6 px-2 text-[10px]'} border-[#27272A]`}>
           BE
         </Button>
-        <Button size="sm" variant="outline" onClick={toggleTrailing}
-          className={`h-6 border-[#27272A] px-2 text-[10px] ${position.trailingStopPips !== null ? 'text-sky-400' : ''}`}>
+        <Button size="sm" variant="outline" onClick={toggleTrailing} aria-pressed={position.trailingStopPips !== null}
+          className={`${largeTargets ? 'h-11 px-3 text-xs' : 'h-6 px-2 text-[10px]'} border-[#27272A] ${position.trailingStopPips !== null ? 'text-sky-400' : ''}`}>
           Trail
         </Button>
 
@@ -154,7 +173,7 @@ function PositionRow({
           <DialogTrigger
             render={
               <Button size="sm" variant="outline" disabled={position.lotSize <= 0.01}
-                className="h-6 border-[#27272A] px-2 text-[10px]" />
+                className={`${largeTargets ? 'h-11 px-3 text-xs' : 'h-6 px-2 text-[10px]'} border-[#27272A]`} />
             }
           >
             Partial
@@ -197,10 +216,12 @@ function ModifyDialog({
   position,
   digits,
   onModify,
+  largeTargets,
 }: {
   position: ReplayPosition
   digits: number
   onModify: (id: string, patch: Partial<Pick<ReplayPosition, 'stopLoss' | 'takeProfit'>>) => void
+  largeTargets: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [sl, setSl] = useState(position.stopLoss?.toString() ?? '')
@@ -210,7 +231,11 @@ function ModifyDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button size="sm" variant="outline" className="h-6 border-[#27272A] px-2 text-[10px]" />
+          <Button
+            size="sm"
+            variant="outline"
+            className={`${largeTargets ? 'h-11 px-3 text-xs' : 'h-6 px-2 text-[10px]'} border-[#27272A]`}
+          />
         }
       >
         Modify

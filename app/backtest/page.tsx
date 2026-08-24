@@ -49,8 +49,6 @@ export default function BacktestPage() {
   const [market, setMarket] = useState<'forex' | 'crypto'>('forex')
   const [pair, setPair] = useState('EUR/USD')
   const [timeframes, setTimeframes] = useState<Timeframe[]>(['15m', '4H'])
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
   const [balance, setBalance] = useState('10000')
   const [leverage, setLeverage] = useState('100')
   const [spreadPips, setSpreadPips] = useState('0.6')
@@ -58,8 +56,14 @@ export default function BacktestPage() {
   const [sessions, setSessions] = useState<SessionListItem[] | null>(null)
   const [creating, setCreating] = useState(false)
 
+  // Display-only mirror of the server's fixed window (lib/actions/replay.ts)
+  const rangeFromDate = (() => {
+    const d = new Date()
+    d.setMonth(d.getMonth() - 11)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })()
+
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     listReplaySessions().then((res) => {
       if (res.success) setSessions(res.data)
       else setSessions([])
@@ -101,10 +105,6 @@ export default function BacktestPage() {
       toast.error('Select at least one timeframe.')
       return
     }
-    if (!dateFrom || !dateTo) {
-      toast.error('Pick a date range.')
-      return
-    }
 
     setCreating(true)
     try {
@@ -114,8 +114,6 @@ export default function BacktestPage() {
         timeframes: [...timeframes].sort(
           (a, b) => TIMEFRAMES.indexOf(a) - TIMEFRAMES.indexOf(b),
         ), // primary = lowest TF first
-        dateFrom,
-        dateTo,
         startingBalance: Number(balance),
         leverage: Number(leverage),
         spreadPips: Number(spreadPips),
@@ -247,18 +245,12 @@ export default function BacktestPage() {
             </div>
           </div>
 
-          {/* Date range */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="date-from">From</Label>
-              <Input id="date-from" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
-                className="border-[#27272A]" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="date-to">To</Label>
-              <Input id="date-to" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
-                className="border-[#27272A]" />
-            </div>
+          {/* Date range — fixed window, server-assigned */}
+          <div className="rounded-md border border-[#27272A] bg-[#0A0B0E] px-3 py-2">
+            <p className="text-xs text-zinc-400">
+              Date range: fixed window · today back to{' '}
+              <span className="font-mono text-zinc-200">{rangeFromDate}</span>
+            </p>
           </div>
 
           {/* Account */}
@@ -295,9 +287,6 @@ export default function BacktestPage() {
               </>
             )}
           </Button>
-          <p className="text-xs text-zinc-500">
-            Historical data is fetched once at session start (Twelve Data free tier: 8 credits/min). Larger ranges take longer.
-          </p>
         </CardContent>
       </Card>
 

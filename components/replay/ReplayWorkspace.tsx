@@ -6,7 +6,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { LogOut, SlidersHorizontal } from 'lucide-react'
+import { Keyboard, LogOut, SlidersHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -31,6 +31,13 @@ import type { Candle, DrawingShape } from '@/lib/types/replay'
 import { pipSize } from '@/lib/replay/execution'
 import { computeIndicators } from '@/lib/replay/indicators'
 import { endReplaySession } from '@/lib/actions/replay'
+import { ConfirmDialog } from './ConfirmDialog'
+
+const SAVE_STATUS_STYLES: Record<'saved' | 'saving' | 'error', { label: string; text: string }> = {
+  saved: { label: 'saved', text: 'text-zinc-500' },
+  saving: { label: 'saving…', text: 'text-zinc-400' },
+  error: { label: 'save failed', text: 'text-[#FF4D4D]' },
+}
 
 interface ReplayWorkspaceProps {
   config: ReplaySessionConfig
@@ -47,6 +54,22 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
   // Order-form draft levels (string form for the inputs; chart lines drag these too)
   const [draftSl, setDraftSl] = useState('')
   const [draftTp, setDraftTp] = useState('')
+  // Trade hotkeys start disarmed; a stray B/S/C must never move capital
+  // uninvited. Armed state persists per browser so power users can leave it on.
+  // Read lazily (not in an effect) so the first render already reflects it.
+  const [tradeKeysArmed, setTradeKeysArmed] = useState(
+    () => typeof window !== 'undefined' && window.localStorage.getItem('replay-trade-keys') === 'armed',
+  )
+  const [showHotkeyHelp, setShowHotkeyHelp] = useState(false)
+  const [confirmEnd, setConfirmEnd] = useState(false)
+  const [confirmClear, setConfirmClear] = useState(false)
+
+  function toggleTradeKeys() {
+    setTradeKeysArmed((v) => {
+      window.localStorage.setItem('replay-trade-keys', v ? 'disarmed' : 'armed')
+      return !v
+    })
+  }
   const session = useReplaySession(config, candlesByTf, resume)
 
   function addDrawing(shape: DrawingShape) {
@@ -154,16 +177,27 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
     toast.success(`${label.toUpperCase()} ${wantsBelow ? 'limit' : 'stop'} placed @ ${entry.toFixed(digits)} · SL/TP attached`)
   }
 
-  useReplayHotkeys({
-    onPlayPause: () => session.hasMoreBars && session.setPlaying(!session.state.playing),
-    onStep: () => !session.state.playing && session.step(),
-    onBuy: () => quickOrder('buy'),
-    onSell: () => quickOrder('sell'),
-    onClosePosition: () => {
-      for (const p of session.state.positions) session.closePositionFull(p.id)
-      if (session.state.positions.length > 0) toast.info('Closed all positions')
+  // Shared with the TradingPanel button so hotkey and click paths stay identical
+  function closeAllPositions() {
+    for (const p of session.state.positions) session.closePositionFull(p.id)
+    if (session.state.positions.length > 0) toast.info('Closed all positions')
+  }
+
+  useReplayHotkeys(
+    {
+      onPlayPause: () => session.hasMoreBars && session.setPlaying(!session.state.playing),
+      onStep: () => !session.state.playing && session.step(),
+      onBuy: () => quickOrder('buy'),
+      onSell: () => quickOrder('sell'),
+      onCloseAll: closeAllPositions,
+      onCancel: () => {
+        if (activeTool) setActiveTool(null)
+        else if (showHotkeyHelp) setShowHotkeyHelp(false)
+      },
+      onToggleHotkeyHelp: () => setShowHotkeyHelp((v) => !v),
     },
-  })
+    tradeKeysArmed,
+  )
 
   const markers = useMemo(
     () => ({ positions: session.state.positions, closedTrades: session.state.closedTrades }),
@@ -173,15 +207,13 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
   const freeMargin = session.equity - session.marginUsed
 
   async function handleEndSession() {
-    if (!window.confirm('End this session? Positions will be left as-is and the session becomes read-only.')) {
-      return
-    }
     setEnding(true)
     const saved = await session.flushSave()
     const res = await endReplaySession(config.id)
     setEnding(false)
     if (!res.success) {
       toast.error(res.error)
+      setConfirmEnd(false)
       return
     }
     if (!saved) toast.warning('Some state may not have saved.')
@@ -219,26 +251,27 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
       onSlChange={setDraftSl}
       onTpChange={setDraftTp}
       onMarketOrder={marketOrderWithDefaults}
-      onCloseAll={() => {
-        for (const p of session.state.positions) session.closePositionFull(p.id)
-        if (session.state.positions.length > 0) toast.info('Closed all positions')
-      }}
+      onCloseAll={closeAllPositions}
     />
   )
 
-  const positionsSection = (
-    <PositionsPanel
-      pair={config.pair}
-      market={config.market}
-      currentPrice={currentPrice}
-      positions={session.state.positions}
-      orders={session.state.orders}
-      onClosePosition={session.closePositionFull}
-      onPartialClose={session.partialClosePosition}
-      onModifyPosition={session.modifyPositionFields}
-      onCancelOrder={session.cancelOrder}
-    />
-  )
+  // Desktop rail uses dense targets; the mobile bottom sheet gets 44px touch rows
+  function renderPositions(largeTargets = false) {
+    return (
+      <PositionsPanel
+        pair={config.pair}
+        market={config.market}
+        currentPrice={currentPrice}
+        positions={session.state.positions}
+        orders={session.state.orders}
+        onClosePosition={session.closePositionFull}
+        onPartialClose={session.partialClosePosition}
+        onModifyPosition={session.modifyPositionFields}
+        onCancelOrder={session.cancelOrder}
+        largeTargets={largeTargets}
+      />
+    )
+  }
 
   return (
     <div className="flex h-[calc(100dvh-4rem)] flex-col gap-3 lg:h-[calc(100dvh-3.5rem)]">
@@ -260,9 +293,35 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
         <Button
           size="sm"
           variant="outline"
-          onClick={handleEndSession}
+          onClick={toggleTradeKeys}
+          aria-pressed={tradeKeysArmed}
+          suppressHydrationWarning
+          title={`B/S/C hotkeys are ${tradeKeysArmed ? 'armed — they place orders' : 'disarmed — press to enable'}`}
+          className={`ml-auto h-7 border-[#27272A] px-2 text-xs ${
+            tradeKeysArmed ? 'border-[#00FF9C]/50 text-[#00FF9C]' : 'text-zinc-400'
+          }`}
+        >
+          <Keyboard className="mr-1 h-3.5 w-3.5" /> Trade keys {tradeKeysArmed ? 'ON' : 'OFF'}
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => setShowHotkeyHelp((v) => !v)}
+          aria-expanded={showHotkeyHelp}
+          aria-label="Toggle hotkey help"
+          className="h-7 px-2 text-xs text-zinc-400"
+        >
+          <span aria-hidden className="font-mono">?</span>
+        </Button>
+        <span role="status" aria-live="polite" className={`font-mono text-[10px] ${SAVE_STATUS_STYLES[session.saveStatus].text}`}>
+          <span aria-hidden>●</span> {SAVE_STATUS_STYLES[session.saveStatus].label}
+        </span>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setConfirmEnd(true)}
           disabled={ending}
-          className="ml-auto border-[#27272A] text-xs"
+          className="border-[#27272A] text-xs"
         >
           <LogOut className="mr-1 h-3.5 w-3.5" /> End Session
         </Button>
@@ -277,7 +336,10 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
         currentBarTime={session.currentBar?.time ?? null}
         notices={session.notices}
         hasMoreBars={session.hasMoreBars}
+        reversing={session.state.reversing}
+        canRewind={session.canRewind}
         onPlayPause={() => session.setPlaying(!session.state.playing)}
+        onToggleReverse={() => session.setReversing(!session.state.reversing)}
         onStep={session.step}
         onSpeedChange={session.setSpeed}
         onTfChange={session.setActiveTf}
@@ -303,6 +365,9 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
             equity={session.equity}
             onAddDrawing={addDrawing}
             onEraseDrawing={(id) => session.setDrawings(session.state.drawings.filter((d) => d.id !== id))}
+            onEditDrawing={(id, patch) =>
+              session.setDrawings(session.state.drawings.map((d) => (d.id === id ? { ...d, ...patch } : d)))
+            }
             onExecutePositionDrawing={executePositionDrawing}
             onSlTpCommit={handleSlTpCommit}
           />
@@ -313,12 +378,16 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
             onSelectTool={setActiveTool}
             onClearAll={() => {
               if (session.state.drawings.length === 0) return
-              if (window.confirm('Clear all drawings?')) session.setDrawings([])
+              setConfirmClear(true)
             }}
             indicatorMenu={
               <IndicatorMenu configs={session.state.indicatorConfigs} onChange={session.setIndicatorConfigs} />
             }
           />
+
+          {showHotkeyHelp && (
+            <HotkeyLegend tradeKeysArmed={tradeKeysArmed} onClose={() => setShowHotkeyHelp(false)} />
+          )}
 
           {/* Mobile trade button → bottom sheet */}
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -346,7 +415,7 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
                     {tradingSection}
                     <div>
                       <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">Positions &amp; Orders</h3>
-                      {positionsSection}
+                      {renderPositions(true)}
                     </div>
                   </div>
                 </TabsContent>
@@ -368,7 +437,7 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
             <h3 className="mb-3 shrink-0 text-xs font-semibold uppercase tracking-wider text-zinc-500">
               Positions &amp; Orders
             </h3>
-            <ScrollArea className="min-h-0 flex-1 pr-1">{positionsSection}</ScrollArea>
+            <ScrollArea className="min-h-0 flex-1 pr-1">{renderPositions()}</ScrollArea>
           </div>
           <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-[#27272A] bg-[#12141A] p-4">
             <AiChatPanelHeader />
@@ -376,6 +445,41 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
           </div>
         </aside>
       </div>
+
+      <ConfirmDialog
+        open={confirmEnd}
+        onOpenChange={(o) => !ending && setConfirmEnd(o)}
+        title="End this session?"
+        loading={ending}
+        confirmLabel="End Session"
+        destructive
+        onConfirm={handleEndSession}
+        description={
+          <>
+            <p>Positions stay as-is and the session becomes read-only.</p>
+            <p className={session.saveStatus === 'error' ? 'text-[#FF4D4D]' : 'text-zinc-400'}>
+              {session.saveStatus === 'error'
+                ? 'Heads up: the latest autosave failed — progress since then may be lost.'
+                : session.saveStatus === 'saving'
+                  ? 'Saving progress…'
+                  : 'All progress is saved.'}
+            </p>
+          </>
+        }
+      />
+
+      <ConfirmDialog
+        open={confirmClear}
+        onOpenChange={setConfirmClear}
+        title="Clear all drawings?"
+        confirmLabel="Clear drawings"
+        destructive
+        onConfirm={() => {
+          session.setDrawings([])
+          setConfirmClear(false)
+        }}
+        description={<p>Removes every drawing from the chart. This cannot be undone.</p>}
+      />
     </div>
   )
 }
@@ -386,5 +490,65 @@ function AccountStat({ label, value, className }: { label: string; value: string
       {label}{' '}
       <span className={`font-mono text-zinc-100 ${className ?? ''}`}>{value}</span>
     </span>
+  )
+}
+
+const HOTKEY_ROWS: Array<[string, string]> = [
+  ['Space', 'Play / pause replay'],
+  ['→', 'Step one bar'],
+  ['B', 'Quick buy at market'],
+  ['S', 'Quick sell at market'],
+  ['C', 'Close all positions'],
+  ['Esc', 'Cancel active tool'],
+]
+
+function HotkeyLegend({ tradeKeysArmed, onClose }: { tradeKeysArmed: boolean; onClose: () => void }) {
+  return (
+    <div
+      role="dialog"
+      aria-label="Hotkey reference"
+      className="absolute bottom-3 left-3 z-30 w-64 rounded-lg border border-[#27272A] bg-[#12141A]/95 p-3 shadow-xl"
+    >
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-xs font-semibold text-zinc-200">Hotkeys</span>
+        <button
+          onClick={onClose}
+          aria-label="Close hotkey help"
+          className="rounded px-1.5 py-0.5 font-mono text-xs text-zinc-500 hover:bg-[#1C1E26] hover:text-zinc-200"
+        >
+          Esc
+        </button>
+      </div>
+      <dl className="space-y-1.5">
+        {HOTKEY_ROWS.map(([key, desc]) => {
+          const tradeKey = key === 'B' || key === 'S' || key === 'C'
+          const dim = tradeKey && !tradeKeysArmed
+          return (
+            <div key={key} className={`flex items-center gap-2 ${dim ? 'opacity-50' : ''}`}>
+              <dt>
+                <kbd className="min-w-7 rounded border border-[#27272A] bg-[#1C1E26] px-1.5 py-0.5 text-center font-mono text-[10px] text-zinc-200">
+                  {key}
+                </kbd>
+              </dt>
+              <dd className="text-xs text-zinc-400">
+                {desc}
+                {dim ? ' (disarmed)' : ''}
+              </dd>
+            </div>
+          )
+        })}
+        <div className="flex items-center gap-2">
+          <dt>
+            <kbd className="min-w-7 rounded border border-[#27272A] bg-[#1C1E26] px-1.5 py-0.5 text-center font-mono text-[10px] text-zinc-200">?</kbd>
+          </dt>
+          <dd className="text-xs text-zinc-400">Toggle this help</dd>
+        </div>
+      </dl>
+      {!tradeKeysArmed && (
+        <p className="mt-2 border-t border-[#27272A] pt-2 text-[11px] text-zinc-500">
+          Trade keys are disarmed. Turn them on with the switch in the account strip.
+        </p>
+      )}
+    </div>
   )
 }

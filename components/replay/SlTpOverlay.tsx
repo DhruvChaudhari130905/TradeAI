@@ -11,6 +11,8 @@ import type { PendingOrder, ReplayPosition } from '@/lib/types/replay'
 import { pipSize, pipValuePerLot } from '@/lib/replay/execution'
 
 const HIT_RADIUS = 8
+// Fingers are far less precise than a mouse — widen the grab zone on touch
+const TOUCH_HIT_RADIUS = 22
 
 export type SlTpPatch =
   | { kind: 'position'; id: string; field: 'stopLoss' | 'takeProfit'; value: number }
@@ -64,6 +66,8 @@ export function SlTpOverlay({
   const [rangeTick, setRangeTick] = useState(0)
   const dragRef = useRef<DragState | null>(null)
   const [dragPreview, setDragPreview] = useState<DragState | null>(null)
+  // Last-grabbed level — arrow keys nudge it (keyboard alternative to dragging)
+  const [selectedKey, setSelectedKey] = useState<string | null>(null)
 
   const ps = pipSize(pair, market)
 
@@ -148,7 +152,7 @@ export function SlTpOverlay({
       if (y === null) continue
 
       ctx.strokeStyle = line.color
-      ctx.lineWidth = dragging ? 2 : 1.5
+      ctx.lineWidth = dragging ? 2 : selectedKey === line.key ? 2.5 : 1.5
       ctx.setLineDash(line.kind === 'draft' ? [6, 4] : [])
       ctx.beginPath()
       ctx.moveTo(0, y)
@@ -226,7 +230,7 @@ export function SlTpOverlay({
       return seriesRef.current?.coordinateToPrice(relY) ?? null
     }
 
-    function hitTest(clientX: number, clientY: number): LineRef | null {
+    function hitTest(clientX: number, clientY: number, radius = HIT_RADIUS): LineRef | null {
       const rect = canvas!.getBoundingClientRect()
       const x = clientX - rect.left
       const y = clientY - rect.top
@@ -234,15 +238,16 @@ export function SlTpOverlay({
         const ly = yInView(line.price)
         if (ly === null) continue
         // Grab anywhere along the line; widest tolerance around the knob + pill
-        if (Math.abs(ly - y) < HIT_RADIUS) return line
-        if (x > size.w - 220 && Math.abs(ly - y) < HIT_RADIUS + 6) return line
+        if (Math.abs(ly - y) < radius) return line
+        if (x > size.w - 220 && Math.abs(ly - y) < radius + 6) return line
       }
       return null
     }
 
     function onPointerDown(e: PointerEvent) {
-      const hit = hitTest(e.clientX, e.clientY)
+      const hit = hitTest(e.clientX, e.clientY, e.pointerType === 'touch' ? TOUCH_HIT_RADIUS : HIT_RADIUS)
       if (!hit) return
+      setSelectedKey(hit.key)
       e.stopPropagation()
       e.preventDefault()
       const price = yToPrice(e.clientY)
@@ -269,12 +274,16 @@ export function SlTpOverlay({
       if (!st) return
       const digits = market === 'crypto' ? 2 : pair.includes('JPY') ? 3 : 5
       const value = Number(st.previewPrice.toFixed(digits))
-      if (st.line.kind === 'position') {
-        onCommit({ kind: 'position', id: st.line.id, field: st.line.field, value })
-      } else if (st.line.kind === 'order') {
-        onCommit({ kind: 'order', id: st.line.id, field: st.line.field, value })
+      commitLineValue(st.line, value)
+    }
+
+    function commitLineValue(line: LineRef, value: number) {
+      if (line.kind === 'position') {
+        onCommit({ kind: 'position', id: line.id, field: line.field, value })
+      } else if (line.kind === 'order') {
+        onCommit({ kind: 'order', id: line.id, field: line.field, value })
       } else {
-        onCommit({ kind: 'draft', field: st.line.field === 'stopLoss' ? 'sl' : 'tp', value })
+        onCommit({ kind: 'draft', field: line.field === 'stopLoss' ? 'sl' : 'tp', value })
       }
     }
 
@@ -288,6 +297,43 @@ export function SlTpOverlay({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines, size, market, pair, onCommit])
+
+  /** Commit a new level value through the same patch channel as chart drags */
+  function commitValue(line: LineRef, value: number) {
+    if (line.kind === 'position') onCommit({ kind: 'position', id: line.id, field: line.field, value })
+    else if (line.kind === 'order') onCommit({ kind: 'order', id: line.id, field: line.field, value })
+    else onCommit({ kind: 'draft', field: line.field === 'stopLoss' ? 'sl' : 'tp', value })
+  }
+
+  // Keyboard nudging of the selected level: arrows move by 1 pip,
+  // Shift+arrows by 10. Escape clears the selection.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (!selectedKey || e.metaKey || e.ctrlKey || e.altKey) return
+      const target = e.target as HTMLElement | null
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+
+      if (e.key === 'Escape') {
+        setSelectedKey(null)
+        return
+      }
+      const stepPips = e.shiftKey ? 10 : 1
+      let delta = 0
+      if (e.key === 'ArrowUp') delta = ps * stepPips
+      else if (e.key === 'ArrowDown') delta = -ps * stepPips
+      else return
+
+      const line = lines.find((l) => l.key === selectedKey)
+      if (!line) return
+      e.preventDefault()
+      const digits = market === 'crypto' ? 2 : pair.includes('JPY') ? 3 : 5
+      commitValue(line, Number((line.price + delta).toFixed(digits)))
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedKey, lines, ps, market, pair])
 
   return (
     <canvas

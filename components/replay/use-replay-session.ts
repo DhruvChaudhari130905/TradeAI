@@ -57,6 +57,8 @@ export interface ResumeState {
 
 export interface ReplayUiState extends SimState {
   playing: boolean
+  /** Reverse playback: chart rewinds bar-by-bar */
+  reversing: boolean
   speed: number // bars per second
   activeTf: Timeframe
   drawings: DrawingShape[]
@@ -93,6 +95,13 @@ export function useReplaySession(
     primaryRef.current = primaryCandles
   }, [primaryCandles])
 
+  // Rewind floor: a session never replays bars before its starting cursor
+  // (fresh sessions start at bar 100; resumed sessions at their saved cursor).
+  const startCursor = useMemo(
+    () => resume?.cursorIndex ?? Math.min(100, Math.max(0, primaryCandles.length - 1)),
+    [resume, primaryCandles.length],
+  )
+
   const [state, setState] = useState<ReplayUiState>(() => ({
     cursorIndex: resume?.cursorIndex ?? Math.min(100, Math.max(0, primaryCandles.length - 1)),
     balance: resume?.balance ?? config.startingBalance,
@@ -100,6 +109,7 @@ export function useReplaySession(
     orders: resume?.orders ?? [],
     closedTrades: resume?.closedTrades ?? [],
     playing: false,
+    reversing: false,
     speed: 2,
     activeTf: primaryTf,
     drawings: resume?.drawings ?? [],
@@ -184,6 +194,7 @@ export function useReplaySession(
       return {
         ...outcome,
         playing: nextIndex < candles.length - 1 ? prev.playing : false,
+        reversing: prev.reversing,
         speed: prev.speed,
         activeTf: prev.activeTf,
         drawings: prev.drawings,
@@ -194,7 +205,46 @@ export function useReplaySession(
     })
   }, [simConfig, pushNotices, recordToJournal])
 
-  // ── Play clock ──
+  // ── Reverse (rewind) ──
+
+  /** Move back one bar by deterministically re-simulating from the session's
+   *  start cursor — same candles + same engine = identical state. Manual
+   *  journal recording and notices are intentionally skipped during resim. */
+  const stepBackward = useCallback(() => {
+    setState((prev) => {
+      const candles = primaryRef.current
+      const target = prev.cursorIndex - 1
+      if (target < startCursor) return { ...prev, reversing: false }
+
+      let sim: SimState = {
+        cursorIndex: startCursor,
+        balance: config.startingBalance,
+        positions: [],
+        orders: [],
+        closedTrades: [],
+      }
+      const equityCurve: EquityPoint[] = []
+      for (let i = startCursor + 1; i <= target; i++) {
+        const outcome = processBar(sim, toSimBar(candles[i]), simConfig)
+        sim = outcome
+        equityCurve.push(outcome.equityPoint)
+      }
+
+      return {
+        ...sim,
+        playing: false,
+        reversing: prev.reversing && target > startCursor,
+        speed: prev.speed,
+        activeTf: prev.activeTf,
+        drawings: prev.drawings,
+        indicatorConfigs: prev.indicatorConfigs,
+        chatMessages: prev.chatMessages,
+        equityCurve,
+      }
+    })
+  }, [config.startingBalance, simConfig, startCursor])
+
+  // ── Play clocks ──
 
   useEffect(() => {
     if (!state.playing) return
@@ -203,7 +253,21 @@ export function useReplaySession(
     return () => clearInterval(timer)
   }, [state.playing, state.speed, step])
 
-  const setPlaying = useCallback((playing: boolean) => setState((p) => ({ ...p, playing })), [])
+  useEffect(() => {
+    if (!state.reversing) return
+    const intervalMs = Math.max(50, Math.round(1000 / state.speed))
+    const timer = setInterval(stepBackward, intervalMs)
+    return () => clearInterval(timer)
+  }, [state.reversing, state.speed, stepBackward])
+
+  const setPlaying = useCallback(
+    (playing: boolean) => setState((p) => ({ ...p, playing, reversing: false })),
+    [],
+  )
+  const setReversing = useCallback(
+    (reversing: boolean) => setState((p) => ({ ...p, reversing, playing: false })),
+    [],
+  )
   const setSpeed = useCallback((speed: number) => setState((p) => ({ ...p, speed })), [])
   const setActiveTf = useCallback((tf: Timeframe) => setState((p) => ({ ...p, activeTf: tf })), [])
 
@@ -324,9 +388,14 @@ export function useReplaySession(
     stateRef.current = state
   }, [state])
 
+  // Visible autosave health so the trader knows progress is durable
+  // ('saved' initially: nothing changed since the last server write)
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved')
+
   /** Persist current state immediately */
   const flushSave = useCallback(async (): Promise<boolean> => {
     if (saveTimer.current) clearTimeout(saveTimer.current)
+    setSaveStatus('saving')
     const snapshot = stateRef.current
     try {
       const res = await saveReplayState({
@@ -341,9 +410,15 @@ export function useReplaySession(
         equityCurve: snapshot.equityCurve.slice(-5000),
         chatMessages: snapshot.chatMessages.slice(-200),
       })
-      if (!res.success) console.warn('[replay-autosave]', res.error)
+      if (!res.success) {
+        console.warn('[replay-autosave]', res.error)
+        setSaveStatus('error')
+      } else {
+        setSaveStatus('saved')
+      }
       return res.success
     } catch {
+      setSaveStatus('error')
       return false
     }
   }, [config])
@@ -356,6 +431,7 @@ export function useReplaySession(
       return
     }
     if (saveTimer.current) clearTimeout(saveTimer.current)
+    setSaveStatus('saving')
     saveTimer.current = setTimeout(() => {
       void flushSave()
     }, AUTOSAVE_DEBOUNCE_MS)
@@ -372,7 +448,10 @@ export function useReplaySession(
     state,
     notices,
     step,
+    stepBackward,
     setPlaying,
+    setReversing,
+    canRewind: state.cursorIndex > startCursor,
     setSpeed,
     setActiveTf,
     placeMarket,
@@ -389,6 +468,7 @@ export function useReplaySession(
     currentBar,
     equity,
     marginUsed,
+    saveStatus,
     flushSave,
     primaryTf,
     hasMoreBars: state.cursorIndex < primaryCandles.length - 1,

@@ -2,7 +2,7 @@
 
 // Replay transport: play/pause, step, speed, timeframe tabs + notice ticker.
 
-import { Play, Pause, StepForward } from 'lucide-react'
+import { Play, Pause, StepForward, Rewind } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { Timeframe } from '@/lib/types/replay'
 import type { ReplayNotice } from './use-replay-session'
@@ -15,8 +15,11 @@ interface ReplayControlsProps {
   currentBarTime: string | null
   notices: ReplayNotice[]
   hasMoreBars: boolean
+  reversing: boolean
+  canRewind: boolean
   onPlayPause: () => void
   onStep: () => void
+  onToggleReverse: () => void
   onSpeedChange: (speed: number) => void
   onTfChange: (tf: Timeframe) => void
 }
@@ -31,8 +34,11 @@ export function ReplayControls({
   currentBarTime,
   notices,
   hasMoreBars,
+  reversing,
+  canRewind,
   onPlayPause,
   onStep,
+  onToggleReverse,
   onSpeedChange,
   onTfChange,
 }: ReplayControlsProps) {
@@ -44,9 +50,20 @@ export function ReplayControls({
         {/* Transport */}
         <Button
           size="icon"
+          onClick={onToggleReverse}
+          disabled={!canRewind}
+          aria-pressed={reversing}
+          className={`h-10 w-10 ${reversing ? 'bg-amber-400 text-[#0A0B0E] hover:bg-amber-400/90' : 'bg-[#00FF9C] text-[#0A0B0E] hover:bg-[#00FF9C]/90'}`}
+          title={reversing ? 'Stop reverse' : 'Reverse play — rewind chart'}
+        >
+          <Rewind className="h-4 w-4" />
+        </Button>
+        <Button
+          size="icon"
           onClick={onPlayPause}
-          disabled={!hasMoreBars}
-          className={`h-9 w-9 ${playing ? 'bg-[#FF4D4D] text-[#0A0B0E] hover:bg-[#FF4D4D]/90' : 'bg-[#00FF9C] text-[#0A0B0E] hover:bg-[#00FF9C]/90'}`}
+          disabled={!hasMoreBars || reversing}
+          aria-pressed={playing}
+          className={`h-10 w-10 ${playing ? 'bg-[#FF4D4D] text-[#0A0B0E] hover:bg-[#FF4D4D]/90' : 'bg-[#00FF9C] text-[#0A0B0E] hover:bg-[#00FF9C]/90'}`}
           title={playing ? 'Pause (Space)' : 'Play (Space)'}
         >
           {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
@@ -56,7 +73,7 @@ export function ReplayControls({
           variant="outline"
           onClick={onStep}
           disabled={!hasMoreBars || playing}
-          className="h-9 w-9 border-[#27272A]"
+          className="h-10 w-10 border-[#27272A]"
           title="Next bar (→)"
         >
           <StepForward className="h-4 w-4" />
@@ -69,7 +86,8 @@ export function ReplayControls({
               key={s}
               type="button"
               onClick={() => onSpeedChange(s)}
-              className={`rounded px-1.5 font-mono text-xs transition-colors ${
+              aria-pressed={speed === s}
+              className={`rounded px-2 py-1.5 font-mono text-xs transition-colors ${
                 speed === s ? 'bg-[#00FF9C]/15 text-[#00FF9C]' : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >
@@ -85,7 +103,8 @@ export function ReplayControls({
               key={tf}
               type="button"
               onClick={() => onTfChange(tf)}
-              className={`rounded px-2.5 py-1 font-mono text-xs transition-colors ${
+              aria-pressed={activeTf === tf}
+              className={`rounded px-3 py-1.5 font-mono text-xs transition-colors ${
                 activeTf === tf ? 'bg-[#00FF9C]/15 text-[#00FF9C]' : 'text-zinc-400 hover:text-zinc-200'
               }`}
             >
@@ -107,7 +126,7 @@ export function ReplayControls({
       </div>
 
       {/* Notice ticker */}
-      <div className="h-5 overflow-hidden">
+      <div role="status" aria-live="polite" className="h-5 overflow-hidden">
         {latest && (
           <p key={latest.id} className="truncate font-mono text-xs text-amber-400">
             {latest.text}

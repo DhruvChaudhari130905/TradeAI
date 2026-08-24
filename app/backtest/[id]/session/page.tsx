@@ -20,6 +20,7 @@ export default function ReplaySessionPage({ params }: { params: Promise<{ id: st
   const [data, setData] = useState<SessionData | null>(null)
   const [candles, setCandles] = useState<Record<string, Candle[]> | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [loadNote, setLoadNote] = useState('Preparing session…')
 
   useEffect(() => {
     let cancelled = false
@@ -50,6 +51,7 @@ export default function ReplaySessionPage({ params }: { params: Promise<{ id: st
         // Fresh fetch, progressive: replay-clock TF first so trading can start,
         // remaining timeframes trickle in behind it.
         const primary = timeframes[0]
+        setLoadNote(`Fetching ${row.pair} ${primary} history…`)
         const accumulated: Record<string, Candle[]> = {}
 
         async function fetchTf(tf: Timeframe): Promise<Record<string, Candle[]> | null> {
@@ -145,8 +147,11 @@ export default function ReplaySessionPage({ params }: { params: Promise<{ id: st
 
   if (!data || !candles || (candles[data.config.timeframes[0] as Timeframe]?.length ?? 0) === 0) {
     return (
-      <div className="flex items-center justify-center py-32">
+      <div className="flex flex-col items-center justify-center gap-3 py-32">
         <Loader2 className="h-6 w-6 animate-spin text-[#00FF9C]" />
+        <p role="status" aria-live="polite" className="text-xs text-zinc-500">
+          {loadNote}
+        </p>
       </div>
     )
   }

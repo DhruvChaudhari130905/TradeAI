@@ -22,18 +22,28 @@ type ActionResult<T> =
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
-const createSessionSchema = z
-  .object({
-    pair: z.string().min(3).max(10),
-    market: z.enum(['forex', 'crypto']),
-    timeframes: z.array(z.enum(TIMEFRAMES)).min(1).max(3),
-    dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
-    dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
-    startingBalance: z.coerce.number().positive().max(100_000_000),
-    leverage: z.coerce.number().int().positive().max(500),
-    spreadPips: z.coerce.number().nonnegative().max(1000),
-  })
-  .refine((v) => v.dateFrom <= v.dateTo, { message: 'dateFrom must be before dateTo', path: ['dateFrom'] })
+const createSessionSchema = z.object({
+  pair: z.string().min(3).max(10),
+  market: z.enum(['forex', 'crypto']),
+  timeframes: z.array(z.enum(TIMEFRAMES)).min(1).max(3),
+  // Dates are server-assigned (last 11 months); client values ignored
+  dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  startingBalance: z.coerce.number().positive().max(100_000_000),
+  leverage: z.coerce.number().int().positive().max(500),
+  spreadPips: z.coerce.number().nonnegative().max(1000),
+})
+
+/** Fixed session window: last 11 months — the max history Twelve Data's free
+ *  plan reliably serves. Server-side so the client can't override it. */
+function defaultDateRange(): { dateFrom: string; dateTo: string } {
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const to = new Date()
+  const from = new Date(to)
+  from.setMonth(from.getMonth() - 11)
+  return { dateFrom: fmt(from), dateTo: fmt(to) }
+}
 
 const saveStateSchema = z.object({
   sessionId: z.string().uuid(),
@@ -81,6 +91,7 @@ export async function createReplaySession(
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { success: false, error: 'Not authenticated' }
 
+    const range = defaultDateRange()
     const { data: row, error } = await supabase
       .from('replay_sessions')
       .insert({
@@ -88,8 +99,8 @@ export async function createReplaySession(
         pair: data.pair,
         market: data.market,
         timeframes: data.timeframes,
-        date_from: data.dateFrom,
-        date_to: data.dateTo,
+        date_from: range.dateFrom,
+        date_to: range.dateTo,
         starting_balance: data.startingBalance,
         balance: data.startingBalance,
         leverage: data.leverage,
@@ -132,9 +143,10 @@ export async function saveReplayState(input: unknown): Promise<ActionResult<null
     if (!user) return { success: false, error: 'Not authenticated' }
 
     // RLS update — only own rows are writable; count check surfaces misses
+    // (count must be requested explicitly, else it's always null)
     const { error, count } = await supabase
       .from('replay_sessions')
-      .update(columnPatch)
+      .update(columnPatch, { count: 'exact' })
       .eq('id', sessionId)
       .eq('user_id', user.id)
 
@@ -287,7 +299,7 @@ export async function saveSessionCandles(
 
     const { count, error } = await supabase
       .from('replay_sessions')
-      .update({ candles: parsed.data.candles })
+      .update({ candles: parsed.data.candles }, { count: 'exact' })
       .eq('id', parsed.data.sessionId)
       .is('candles', null)
 

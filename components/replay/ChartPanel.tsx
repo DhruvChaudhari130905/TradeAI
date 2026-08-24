@@ -72,6 +72,7 @@ interface ChartPanelProps {
   equity: number
   onAddDrawing: (shape: DrawingShape) => void
   onEraseDrawing: (id: string) => void
+  onEditDrawing: (id: string, patch: Partial<Pick<DrawingShape, 'points' | 'tpPrice' | 'label'>>) => void
   onExecutePositionDrawing: (shape: DrawingShape) => void
   onSlTpCommit: (patch: SlTpPatch) => void
 }
@@ -150,6 +151,7 @@ export function ChartPanel({
   equity,
   onAddDrawing,
   onEraseDrawing,
+  onEditDrawing,
   onExecutePositionDrawing,
   onSlTpCommit,
 }: ChartPanelProps) {
@@ -389,6 +391,7 @@ export function ChartPanel({
             market={market}
             onAdd={onAddDrawing}
             onErase={onEraseDrawing}
+            onEdit={onEditDrawing}
             onExecute={onExecutePositionDrawing}
           />
           <SlTpOverlay
