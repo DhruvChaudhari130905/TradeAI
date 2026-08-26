@@ -80,7 +80,12 @@ export async function fetchTimeSeries(params: FetchTimeSeriesParams): Promise<Ca
   const data = await response.json()
 
   if (data.status === 'error') {
-    throw new Error(`Twelve Data API error: ${data.message ?? 'Unknown error'}`)
+    const message = data.message ?? 'Unknown error'
+    // TD answers HTTP 400 "no data" for ranges containing zero trading days
+    // (weekend/holiday-only windows, e.g. a short delta fetch) — empty result,
+    // not a failure.
+    if (/no data/i.test(message)) return []
+    throw new Error(`Twelve Data API error: ${message}`)
   }
 
   if (!response.ok) {
@@ -131,25 +136,32 @@ export async function fetchTimeSeriesPaginated(
   const chunkDays = Math.max(1, Math.floor(4800 / BARS_PER_DAY[interval]))
   const chunkMs = chunkDays * 24 * 60 * 60 * 1000
 
-  const allCandles: Candle[] = []
   const start = new Date(`${startDate}T00:00:00Z`)
   const end = new Date(`${endDate}T23:59:59Z`)
 
+  const ranges: Array<{ start: Date; end: Date }> = []
   let chunkStart = new Date(start)
-
   while (chunkStart < end) {
     const chunkEnd = new Date(Math.min(chunkStart.getTime() + chunkMs, end.getTime()))
-
-    const chunk = await fetchTimeSeries({
-      symbol,
-      interval: tdInterval,
-      start_date: chunkStart.toISOString().split('T')[0],
-      end_date: chunkEnd.toISOString().split('T')[0],
-    })
-
-    allCandles.push(...chunk)
+    ranges.push({ start: chunkStart, end: chunkEnd })
     chunkStart = new Date(chunkEnd.getTime() + 1) // advance without gaps; dedupe below
   }
+
+  // Chunks fire in parallel; the shared rate limiter paces them (burst of 7
+  // immediately, later ones wait for window slots), so wall-clock time tracks
+  // credits instead of sequential round-trips.
+  const chunks = await Promise.all(
+    ranges.map((r) =>
+      fetchTimeSeries({
+        symbol,
+        interval: tdInterval,
+        start_date: r.start.toISOString().split('T')[0],
+        end_date: r.end.toISOString().split('T')[0],
+      }),
+    ),
+  )
+
+  const allCandles: Candle[] = chunks.flat()
 
   // Deduplicate by time (chunk boundaries can share a bar)
   const seen = new Set<string>()

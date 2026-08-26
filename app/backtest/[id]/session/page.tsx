@@ -4,7 +4,7 @@
 
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Loader2 } from 'lucide-react'
+import { ChartLoader } from '@/components/replay/ChartLoader'
 import { ReplayWorkspace } from '@/components/replay/ReplayWorkspace'
 import type { ResumeState, ReplaySessionConfig } from '@/components/replay/use-replay-session'
 import { getReplaySession, getSessionCandles, saveSessionCandles } from '@/lib/actions/replay'
@@ -148,7 +148,7 @@ export default function ReplaySessionPage({ params }: { params: Promise<{ id: st
   if (!data || !candles || (candles[data.config.timeframes[0] as Timeframe]?.length ?? 0) === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-32">
-        <Loader2 className="h-6 w-6 animate-spin text-[#00FF9C]" />
+        <ChartLoader />
         <p role="status" aria-live="polite" className="text-xs text-zinc-500">
           {loadNote}
         </p>
