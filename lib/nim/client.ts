@@ -2,7 +2,7 @@ import OpenAI from 'openai'
 
 // Nemotron-3 models available as of July 2026
 // nvidia/llama-3.1-nemotron-70b-instruct is DEPRECATED (returns 404)
-export const NIM_MODEL = 'nvidia/nemotron-3-super-120b-a12b'
+export const NIM_MODEL = 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning'
 export const NIM_FALLBACK_MODEL = 'nvidia/nemotron-3-nano-30b-a3b'
 
 let _nimClient: OpenAI | null = null
