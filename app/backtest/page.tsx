@@ -9,12 +9,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Play, Plus, Loader2 } from 'lucide-react'
+import { Play, Plus, Loader2, Trash2 } from 'lucide-react'
 import {
   createReplaySession,
   listReplaySessions,
+  deleteReplaySession,
 } from '@/lib/actions/replay'
-import { FOREX_PAIRS, CRYPTO_PAIRS } from '@/lib/types/trade'
+import { FOREX_PAIRS, CRYPTO_PAIRS, COMMODITY_PAIRS } from '@/lib/types/trade'
 import { TIMEFRAMES } from '@/lib/types/replay'
 import type { Timeframe } from '@/lib/types/replay'
 
@@ -55,6 +56,20 @@ export default function BacktestPage() {
 
   const [sessions, setSessions] = useState<SessionListItem[] | null>(null)
   const [creating, setCreating] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  async function handleDelete(sessionId: string) {
+    if (!window.confirm('Delete this session? Journal trades recorded from it will be kept.')) return
+    setDeletingId(sessionId)
+    const res = await deleteReplaySession(sessionId)
+    setDeletingId(null)
+    if (res.success) {
+      setSessions((prev) => prev?.filter((s) => s.id !== sessionId) ?? prev)
+      toast.success('Session deleted.')
+    } else {
+      toast.error(res.error)
+    }
+  }
 
   // Display-only mirror of the server's fixed window (lib/actions/replay.ts)
   const rangeFromDate = (() => {
@@ -159,10 +174,13 @@ export default function BacktestPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             {activeSessions.map((s) => (
-              <button
+              <div
                 key={s.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => router.push(`/backtest/${s.id}/session`)}
-                className="flex w-full items-center justify-between rounded-lg border border-[#27272A] px-4 py-3 text-left transition-colors hover:border-[#00FF9C]/50 hover:bg-[#1C1E26]"
+                onKeyDown={(e) => { if (e.key === 'Enter') router.push(`/backtest/${s.id}/session`) }}
+                className="flex w-full cursor-pointer items-center justify-between rounded-lg border border-[#27272A] px-4 py-3 text-left transition-colors hover:border-[#00FF9C]/50 hover:bg-[#1C1E26]"
               >
                 <div>
                   <span className="font-mono font-medium">{s.pair}</span>
@@ -175,8 +193,22 @@ export default function BacktestPage() {
                     Balance ${Number(s.balance).toLocaleString()} · started {new Date(s.created_at).toLocaleDateString()}
                   </span>
                 </div>
-                <Play className="h-4 w-4 text-[#00FF9C]" />
-              </button>
+                <span className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Delete ${s.pair} session`}
+                    disabled={deletingId === s.id}
+                    onClick={(e) => { e.stopPropagation(); handleDelete(s.id) }}
+                    className="h-8 w-8 text-zinc-500 hover:bg-[#FF4D4D]/10 hover:text-[#FF4D4D]"
+                  >
+                    {deletingId === s.id
+                      ? <Loader2 className="h-4 w-4 animate-spin" />
+                      : <Trash2 className="h-4 w-4" />}
+                  </Button>
+                  <Play className="h-4 w-4 text-[#00FF9C]" />
+                </span>
+              </div>
             ))}
           </CardContent>
         </Card>
@@ -215,9 +247,22 @@ export default function BacktestPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="max-h-64 border-[#27272A] bg-[#12141A]">
-                {(market === 'forex' ? FOREX_PAIRS : CRYPTO_PAIRS).map((p) => (
-                  <SelectItem key={p} value={p} className="font-mono">{p}</SelectItem>
-                ))}
+                {market === 'forex' ? (
+                  <>
+                    <div className="px-2 py-1.5 text-xs font-medium text-zinc-500">Forex</div>
+                    {FOREX_PAIRS.map((p) => (
+                      <SelectItem key={p} value={p} className="font-mono">{p}</SelectItem>
+                    ))}
+                    <div className="px-2 py-1.5 text-xs font-medium text-zinc-500">Commodities</div>
+                    {COMMODITY_PAIRS.map((p) => (
+                      <SelectItem key={p} value={p} className="font-mono">{p}</SelectItem>
+                    ))}
+                  </>
+                ) : (
+                  CRYPTO_PAIRS.map((p) => (
+                    <SelectItem key={p} value={p} className="font-mono">{p}</SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -298,10 +343,13 @@ export default function BacktestPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             {pastSessions.map((s) => (
-              <button
+              <div
                 key={s.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => router.push(`/backtest/${s.id}/results`)}
-                className="flex w-full items-center justify-between rounded-lg border border-[#27272A] px-4 py-3 text-left transition-colors hover:border-zinc-600 hover:bg-[#1C1E26]"
+                onKeyDown={(e) => { if (e.key === 'Enter') router.push(`/backtest/${s.id}/results`) }}
+                className="flex w-full cursor-pointer items-center justify-between rounded-lg border border-[#27272A] px-4 py-3 text-left transition-colors hover:border-zinc-600 hover:bg-[#1C1E26]"
               >
                 <div>
                   <span className="font-mono font-medium">{s.pair}</span>
@@ -321,7 +369,19 @@ export default function BacktestPage() {
                     </span>
                   </span>
                 </div>
-              </button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Delete ${s.pair} session`}
+                  disabled={deletingId === s.id}
+                  onClick={(e) => { e.stopPropagation(); handleDelete(s.id) }}
+                  className="h-8 w-8 text-zinc-500 hover:bg-[#FF4D4D]/10 hover:text-[#FF4D4D]"
+                >
+                  {deletingId === s.id
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : <Trash2 className="h-4 w-4" />}
+                </Button>
+              </div>
             ))}
           </CardContent>
         </Card>

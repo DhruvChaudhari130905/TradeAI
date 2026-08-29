@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   CandlestickSeries,
   ColorType,
+  CrosshairMode,
   HistogramSeries,
   LineSeries,
   LineStyle,
@@ -30,6 +31,7 @@ import type {
   ReplayIndicatorConfig,
   ReplayPosition,
 } from '@/lib/types/replay'
+import { priceDigits, priceMinMove } from '@/lib/replay/execution'
 import { toChartTime } from '@/lib/replay/time'
 import { computeIndicators, type IndicatorSeries } from '@/lib/replay/indicators'
 import { DrawingOverlay, type DrawTool } from './DrawingOverlay'
@@ -200,6 +202,9 @@ export function ChartPanel({
         secondsVisible: false,
       },
       crosshair: {
+        // Free-follow by default (horizontal line tracks the cursor); a
+        // runtime effect switches to Magnet while a draw tool is active
+        mode: CrosshairMode.Normal,
         vertLine: { color: '#52525B', labelBackgroundColor: '#27272A' },
         horzLine: { color: '#52525B', labelBackgroundColor: '#27272A' },
       },
@@ -213,6 +218,13 @@ export function ChartPanel({
       borderDownColor: RED,
       wickUpColor: GREEN,
       wickDownColor: RED,
+      // Full instrument precision on the price axis / gridlines
+      // (5 digits for FX, 3 for JPY pairs, 2 for crypto)
+      priceFormat: {
+        type: 'price',
+        precision: priceDigits(pair, market),
+        minMove: priceMinMove(pair, market),
+      },
     })
 
     chartRef.current = chart
@@ -230,7 +242,18 @@ export function ChartPanel({
       prevLastTimeRef.current = null
       setChartReady(false)
     }
+    // pair/market are fixed for a session's lifetime; rebuilding the chart on
+    // their (theoretical) change would be wasteful
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Crosshair mode: Magnet (snap horizontal line to candle close) while a draw
+  // tool is active, free-follow (Normal) the rest of the time
+  useEffect(() => {
+    chartRef.current?.applyOptions({
+      crosshair: { mode: activeTool !== null ? CrosshairMode.Magnet : CrosshairMode.Normal },
+    })
+  }, [activeTool, chartReady])
 
   // Data updates: single-bar append uses update(), anything else setData()
   useEffect(() => {

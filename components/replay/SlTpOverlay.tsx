@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { IChartApi, ISeriesApi } from 'lightweight-charts'
 import type { PendingOrder, ReplayPosition } from '@/lib/types/replay'
-import { pipSize, pipValuePerLot } from '@/lib/replay/execution'
+import { pipSize, pipValuePerLot, priceDigits } from '@/lib/replay/execution'
 
 const HIT_RADIUS = 8
 // Fingers are far less precise than a mouse — widen the grab zone on touch
@@ -272,7 +272,7 @@ export function SlTpOverlay({
       dragRef.current = null
       setDragPreview(null)
       if (!st) return
-      const digits = market === 'crypto' ? 2 : pair.includes('JPY') ? 3 : 5
+      const digits = priceDigits(pair, market)
       const value = Number(st.previewPrice.toFixed(digits))
       commitLineValue(st.line, value)
     }
@@ -326,7 +326,7 @@ export function SlTpOverlay({
       const line = lines.find((l) => l.key === selectedKey)
       if (!line) return
       e.preventDefault()
-      const digits = market === 'crypto' ? 2 : pair.includes('JPY') ? 3 : 5
+      const digits = priceDigits(pair, market)
       commitValue(line, Number((line.price + delta).toFixed(digits)))
     }
 

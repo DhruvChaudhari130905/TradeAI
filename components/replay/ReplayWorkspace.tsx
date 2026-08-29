@@ -28,7 +28,7 @@ import {
   type ResumeState,
 } from './use-replay-session'
 import type { Candle, DrawingShape } from '@/lib/types/replay'
-import { pipSize } from '@/lib/replay/execution'
+import { pipSize, priceDigits } from '@/lib/replay/execution'
 import { computeIndicators } from '@/lib/replay/indicators'
 import { endReplaySession } from '@/lib/actions/replay'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -156,7 +156,7 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
 
     const halfSpread = pipSize(config.pair, config.market) * (config.spreadPips / 2)
     const label = shape.kind === 'long_position' ? 'LONG' : 'SHORT'
-    const digits = config.market === 'crypto' ? 2 : config.pair.includes('JPY') ? 3 : 5
+    const digits = priceDigits(config.pair, config.market)
 
     if (Math.abs(entry - currentPrice) <= halfSpread) {
       session.placeMarket(side, lots, sl, tp)
@@ -364,7 +364,15 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
             currentPrice={currentPrice}
             equity={session.equity}
             onAddDrawing={addDrawing}
-            onEraseDrawing={(id) => session.setDrawings(session.state.drawings.filter((d) => d.id !== id))}
+            onEraseDrawing={(id) => {
+              const remaining = session.state.drawings.filter((d) => d.id !== id)
+              session.setDrawings(remaining)
+              // Persist the delete immediately so it survives a reload even if
+              // the debounced autosave later fails
+              void session.flushSave({ drawings: remaining }).then((ok) => {
+                if (!ok) toast.error('Delete could not be saved — the drawing may reappear on reload.')
+              })
+            }}
             onEditDrawing={(id, patch) =>
               session.setDrawings(session.state.drawings.map((d) => (d.id === id ? { ...d, ...patch } : d)))
             }

@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { getReplaySession } from '@/lib/actions/replay'
 import type { PersonalityReviewSet, ReplayPersonalityReview, ReplaySessionRow } from '@/lib/types/replay'
 import { computeSessionStats } from '@/lib/replay/stats'
+import { priceDigits } from '@/lib/replay/execution'
 
 const REVIEWER_META: { key: keyof Omit<PersonalityReviewSet, 'composite_score'>; label: string; accent: string }[] = [
   { key: 'prop_firm_evaluator', label: 'Prop Firm Evaluator', accent: '#F59E0B' },
@@ -85,7 +86,7 @@ export default function ReplayResultsPage({ params }: { params: Promise<{ id: st
     )
   }
 
-  const digits = session.market === 'crypto' ? 2 : session.pair.includes('JPY') ? 3 : 5
+  const digits = priceDigits(session.pair, session.market)
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 py-6">

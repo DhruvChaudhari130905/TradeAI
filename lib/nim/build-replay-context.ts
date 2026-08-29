@@ -1,5 +1,5 @@
 import type { Candle, PendingOrder, ReplayPosition } from '@/lib/types/replay'
-import { floatingPnl, pipSize } from '@/lib/replay/execution'
+import { floatingPnl, pipSize, priceDigits } from '@/lib/replay/execution'
 
 // Builds the [SESSION DATA] block the replay coach sees each turn.
 // Pure functions — safe on client (snapshot build) and server (formatting).
@@ -31,7 +31,7 @@ export interface ReplayContextSnapshot {
 
 export function buildReplayContext(s: ReplayContextSnapshot): string {
   const lines: string[] = []
-  const digits = s.market === 'crypto' ? 2 : s.pair.includes('JPY') ? 3 : 5
+  const digits = priceDigits(s.pair, s.market)
   const fmt = (n: number) => n.toFixed(digits)
 
   lines.push('[SESSION DATA]')

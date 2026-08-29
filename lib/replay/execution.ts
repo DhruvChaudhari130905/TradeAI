@@ -13,9 +13,21 @@ export function isCrypto(market: 'forex' | 'crypto'): boolean {
   return market === 'crypto'
 }
 
-/** Smallest quoted increment used as a "pip" for the pair */
+/** Instrument contract size for one lot: 100oz gold, 5000oz silver,
+ *  100k units forex, 1 unit crypto */
+export function contractSize(pair: string, market: 'forex' | 'crypto'): number {
+  if (market === 'crypto') return 1
+  if (pair.startsWith('XAU/')) return 100
+  if (pair.startsWith('XAG/')) return 5000
+  return 100000
+}
+
+/** Smallest quoted increment used as a "pip" for the pair
+ *  (commodities follow TradingView tick sizes: gold 0.01, silver 0.001) */
 export function pipSize(pair: string, market: 'forex' | 'crypto'): number {
   if (market === 'crypto') return 1
+  if (pair.startsWith('XAU/')) return 0.01
+  if (pair.startsWith('XAG/')) return 0.001
   if (pair.includes('JPY')) return 0.01
   return 0.0001
 }
@@ -41,7 +53,7 @@ export function fillPrice(
 export function pipValuePerLot(pair: string, market: 'forex' | 'crypto', price: number): number {
   if (market === 'crypto') return 1 // unused for crypto PnL path
   const ps = pipSize(pair, market)
-  const raw = ps * 100000 // e.g. $10/pip/lot for EUR/USD
+  const raw = ps * contractSize(pair, market) // e.g. $10/pip/lot EUR/USD, $1/pip/lot gold
   if (pair.includes('JPY')) return raw / price // JPY quote → USD at pair rate
   return raw
 }
@@ -94,15 +106,16 @@ export function marginFor(
   lotSize: number,
   leverage: number,
   market: 'forex' | 'crypto',
+  pair?: string,
 ): number {
-  const contract = market === 'crypto' ? 1 : 100000
+  const contract = pair !== undefined ? contractSize(pair, market) : market === 'crypto' ? 1 : 100000
   return (lotSize * contract * entryPrice) / leverage
 }
 
-/** Total margin locked by all open positions */
-export function usedMargin(positions: ReplayPosition[], leverage: number, market: 'forex' | 'crypto'): number {
+/** Total margin locked by all open positions (single instrument per session) */
+export function usedMargin(positions: ReplayPosition[], leverage: number, market: 'forex' | 'crypto', pair: string): number {
   return positions.reduce(
-    (sum, p) => sum + marginFor(p.entryPrice, p.lotSize, leverage, market),
+    (sum, p) => sum + marginFor(p.entryPrice, p.lotSize, leverage, market, pair),
     0,
   )
 }
@@ -117,4 +130,23 @@ export function isStopOut(equity: number, used: number): boolean {
 /** Round lot size to a sane precision (min 0.01) */
 export function roundLots(lots: number): number {
   return Math.max(0.01, Math.round(lots * 100) / 100)
+}
+
+/** Decimal places a price is quoted with for this instrument
+ *  (5 for FX, 3 for JPY/silver, 2 for gold, 2 for crypto) */
+export function priceDigits(pair: string, market: 'forex' | 'crypto'): number {
+  if (market === 'crypto') return 2
+  if (pair.startsWith('XAU/')) return 2
+  if (pair.startsWith('XAG/')) return 3
+  return pair.includes('JPY') ? 3 : 5
+}
+
+/** Smallest representable price increment for the price axis / rounding */
+export function priceMinMove(pair: string, market: 'forex' | 'crypto'): number {
+  return 1 / 10 ** priceDigits(pair, market)
+}
+
+/** Format a price at the instrument's quoted precision */
+export function formatPrice(price: number, pair: string, market: 'forex' | 'crypto'): string {
+  return price.toFixed(priceDigits(pair, market))
 }

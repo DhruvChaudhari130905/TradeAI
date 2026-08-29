@@ -291,10 +291,10 @@ export function useReplaySession(
       setState((prev) => {
         const bar = primaryRef.current[prev.cursorIndex]
         if (!bar) return prev
-        return { ...prev, ...placeOrder(prev, order, toSimBar(bar)) }
+        return { ...prev, ...placeOrder(prev, order, toSimBar(bar), simConfig) }
       })
     },
-    [],
+    [simConfig],
   )
 
   const cancelOrder = useCallback((orderId: string) => {
@@ -376,7 +376,7 @@ export function useReplaySession(
     )
   }, [state.positions, currentBar, config])
 
-  const marginUsed = useMemo(() => usedMargin(state.positions, config.leverage, config.market), [state.positions, config])
+  const marginUsed = useMemo(() => usedMargin(state.positions, config.leverage, config.market, config.pair), [state.positions, config])
 
   const equity = state.balance + floatingTotal
 
@@ -392,11 +392,12 @@ export function useReplaySession(
   // ('saved' initially: nothing changed since the last server write)
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved')
 
-  /** Persist current state immediately */
-  const flushSave = useCallback(async (): Promise<boolean> => {
+  /** Persist current state immediately. `override` merges over the ref snapshot
+   *  so a caller can persist state it just set before React re-renders. */
+  const flushSave = useCallback(async (override?: { drawings?: DrawingShape[] }): Promise<boolean> => {
     if (saveTimer.current) clearTimeout(saveTimer.current)
     setSaveStatus('saving')
-    const snapshot = stateRef.current
+    const snapshot = { ...stateRef.current, ...override }
     try {
       const res = await saveReplayState({
         sessionId: config.id,

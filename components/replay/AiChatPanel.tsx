@@ -6,6 +6,7 @@
 import { useRef, useState } from 'react'
 import { Loader2, SendHorizonal, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
+import { priceDigits } from '@/lib/replay/execution'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Textarea } from '@/components/ui/textarea'
@@ -38,10 +39,6 @@ interface AiChatPanelProps {
   closedTrades: ClosedReplayTrade[]
   chatMessages: ChatMessage[]
   appendChatMessages: (messages: ChatMessage[]) => void
-}
-
-function priceDigits(pair: string, market: 'forex' | 'crypto'): number {
-  return market === 'crypto' ? 2 : pair.includes('JPY') ? 3 : 5
 }
 
 /** Current value of one configured indicator, or null when not computable */

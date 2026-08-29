@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { OrderSizing } from './use-order-sizing'
+import { priceDigits } from '@/lib/replay/execution'
 
 interface TradingPanelProps {
   pair: string
@@ -41,7 +42,7 @@ export function TradingPanel({
 }: TradingPanelProps) {
   const { lotMode, setLotMode, lots, setLots, riskPct, setRiskPct } = sizing
 
-  const priceDigits = market === 'crypto' ? 2 : pair.includes('JPY') ? 3 : 5
+  const currentPriceDigits = priceDigits(pair, market)
 
   /** Effective lot size after applying the selected sizing mode */
   function effectiveLots(): number | null {
@@ -143,7 +144,7 @@ export function TradingPanel({
 
       <p className="font-mono text-[10px] text-zinc-500">
         {shownLots !== null ? `Size: ${shownLots} lots` : '—'} · spread applies to fills · price{' '}
-        {currentPrice !== null ? currentPrice.toFixed(priceDigits) : '—'}
+        {currentPrice !== null ? currentPrice.toFixed(currentPriceDigits) : '—'}
       </p>
     </div>
   )

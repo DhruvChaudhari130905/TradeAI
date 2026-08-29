@@ -107,6 +107,10 @@ export const CRYPTO_PAIRS = [
   'ALGO/USD', 'FIL/USD', 'HBAR/USD', 'FTM/USD', 'AAVE/USD',
 ]
 
+/** Spot metals via TwelveData — kept separate in the UI, routed as forex math
+ *  internally with commodity contract sizes in lib/replay/execution.ts */
+export const COMMODITY_PAIRS = ['XAU/USD', 'XAG/USD']
+
 export const ALL_PAIRS = [...FOREX_PAIRS, ...CRYPTO_PAIRS]
 
 export function detectMarket(pair: string): Market {

@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import type { PendingOrder, ReplayPosition } from '@/lib/types/replay'
-import { floatingPnl, pipSize } from '@/lib/replay/execution'
+import { floatingPnl, pipSize, priceDigits } from '@/lib/replay/execution'
 
 interface PositionsPanelProps {
   pair: string
@@ -101,7 +101,7 @@ function PositionRow({
 }) {
   const [partialOpen, setPartialOpen] = useState(false)
   const pnl = currentPrice !== null ? floatingPnl(position, currentPrice, pair, market) : 0
-  const digits = market === 'crypto' ? 2 : pair.includes('JPY') ? 3 : 5
+  const digits = priceDigits(pair, market)
 
   function moveBreakeven() {
     if (!currentPrice) return

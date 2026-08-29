@@ -1,5 +1,6 @@
 import type { ClosedReplayTrade, PersonalityReviewSet, ReplayPersonalityReview, ReplaySessionRow } from '@/lib/types/replay'
 import { computeSessionStats, type SessionStats } from '@/lib/replay/stats'
+import { priceDigits } from '@/lib/replay/execution'
 import {
   REPLAY_PROP_FIRM_EVALUATOR_PROMPT,
   REPLAY_INSTITUTIONAL_TRADER_PROMPT,
@@ -20,7 +21,7 @@ export function buildReplayReviewContext(
   const stats = computeSessionStats(trades, session.equity_curve, Number(session.starting_balance))
 
   const lines: string[] = []
-  const digits = session.market === 'crypto' ? 2 : String(session.pair).includes('JPY') ? 3 : 5
+  const digits = priceDigits(String(session.pair), session.market)
 
   lines.push('[REPLAY SESSION DATA]')
   lines.push(`Instrument: ${session.pair} (${session.market}) · timeframes: ${(session.timeframes as string[]).join(', ')}`)

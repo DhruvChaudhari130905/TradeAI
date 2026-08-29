@@ -1,13 +1,15 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useMemo, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { tradeSchema, type TradeFormData, type Session, type Outcome, FOREX_PAIRS, CRYPTO_PAIRS, detectMarket } from '@/lib/types/trade'
-import { createTrade, updateTrade, uploadScreenshot } from '@/lib/actions/trades'
+import { tradeSchema, type TradeFormData, type Session, type Outcome, FOREX_PAIRS, CRYPTO_PAIRS, COMMODITY_PAIRS, detectMarket } from '@/lib/types/trade'
+import { createTrade, updateTrade, uploadScreenshot, extractTradeFromScreenshot } from '@/lib/actions/trades'
+import type { TradeImageExtraction, ExtractField, ExtractedFieldValue } from '@/lib/nim/trade-extract-types'
+import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { Plus, Trash2, Upload, X, ArrowUpRight, ArrowDownRight, Loader2 } from 'lucide-react'
+import { Check, Plus, Trash2, Upload, X, ArrowUpRight, ArrowDownRight, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -22,12 +24,32 @@ interface TradeFormProps {
   mode?: 'create' | 'edit'
 }
 
+/** Short labels for extracted fields shown in the review strip chips. */
+const IMPORT_FIELD_LABELS: Partial<Record<ExtractField, string>> = {
+  pair: 'Pair',
+  direction: 'Direction',
+  entry_price: 'Entry',
+  exit_price: 'Exit',
+  stop_loss: 'Stop Loss',
+  take_profit: 'Take Profit',
+  lot_size: 'Lot Size',
+  outcome: 'Outcome',
+  pnl_usd: 'PnL',
+  session: 'Session',
+  entry_time: 'Entry Time',
+  exit_time: 'Exit Time',
+}
+
 export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [screenshots, setScreenshots] = useState<string[]>(trade?.screenshot_urls ?? [])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<TradeImageExtraction | null>(null)
+  const [confirmedFields, setConfirmedFields] = useState<Set<ExtractField>>(new Set())
+  const [isDragging, setIsDragging] = useState(false)
 
   const {
     register,
@@ -103,12 +125,105 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
   const rr = computeRR()
 
   const onFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (!files?.length) return
+    if (e.target.files?.length) await uploadFiles(e.target.files)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
 
+  const removeScreenshot = (url: string) => {
+    setScreenshots((prev) => prev.filter((s) => s !== url))
+  }
+
+  const runExtraction = async (url: string) => {
+    setImporting(true)
+    setImportResult(null)
+    setConfirmedFields(new Set())
+    try {
+      const result = await extractTradeFromScreenshot(url)
+      if (result.success) {
+        setImportResult(result.data)
+        applyExtraction(result.data.fields)
+      } else {
+        toast.error(result.error)
+      }
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  const applyExtraction = (fields: Partial<Record<ExtractField, ExtractedFieldValue>>) => {
+    const str = (f: ExtractField) => {
+      const v = fields[f]?.value
+      return v === null || v === undefined ? undefined : String(v)
+    }
+    const num = (f: ExtractField) => {
+      const v = fields[f]?.value
+      return typeof v === 'number' ? v : undefined
+    }
+
+    if (str('pair')) onPairChange(str('pair')!)
+    if (str('direction') && (str('direction') === 'long' || str('direction') === 'short')) {
+      setValue('direction', str('direction') as 'long' | 'short')
+    }
+    if (num('entry_price') !== undefined) setValue('entry_price', num('entry_price')!)
+    if (num('exit_price') !== undefined) setValue('exit_price', num('exit_price')!)
+    if (num('stop_loss') !== undefined) setValue('stop_loss', num('stop_loss')!)
+    if (num('take_profit') !== undefined) setValue('take_profit', num('take_profit')!)
+    if (num('lot_size') !== undefined) setValue('lot_size', num('lot_size')!)
+    if (num('risk_reward_ratio') !== undefined) setValue('risk_reward_ratio', num('risk_reward_ratio')!)
+    if (num('pnl_usd') !== undefined) setValue('pnl_usd', num('pnl_usd')!)
+    if (str('session') && (str('session') === 'london' || str('session') === 'new_york' || str('session') === 'asian' || str('session') === 'overlap' || str('session') === 'other')) {
+      setValue('session', str('session') as Session)
+    }
+    if (str('entry_time')) setValue('entry_time', str('entry_time')!)
+    if (str('exit_time')) setValue('exit_time', str('exit_time')!)
+    if (str('notes')) setValue('notes', str('notes')!)
+    const tagArr = fields.tags?.value
+    if (Array.isArray(tagArr) && tagArr.length > 0) setValue('tags', tagArr.join(', '))
+    else if (typeof tagArr === 'string' && tagArr.length > 0) setValue('tags', tagArr)
+
+    toast.success('Extracted details applied — review the highlighted fields')
+  }
+
+  // Amber fields that the user must confirm and that map to a visible form input
+  const amberFields = useMemo(() => {
+    if (!importResult) return [] as ExtractField[]
+    return (Object.keys(importResult.fields) as ExtractField[]).filter((f) => {
+      const fv = importResult.fields[f]
+      if (!fv || fv.confidence !== 'guessed') return false
+      if (f === 'notes' || f === 'tags' || f === 'market' || f === 'risk_reward_ratio') return false
+      return fv.value !== null && !(Array.isArray(fv.value) && fv.value.length === 0)
+    })
+  }, [importResult])
+
+  const toggleConfirmField = (field: ExtractField) => {
+    setConfirmedFields((prev) => {
+      const next = new Set(prev)
+      if (next.has(field)) next.delete(field)
+      else next.add(field)
+      return next
+    })
+  }
+
+  // Border/ring class applied to the existing form inputs when a field was
+  // extracted: blue = verified, amber = needs confirmation, green = AI draft.
+  const fieldRing = (field: ExtractField): string => {
+    if (!importResult) return ''
+    const fv = importResult.fields[field]
+    if (!fv || fv.value === null || (Array.isArray(fv.value) && fv.value.length === 0)) return ''
+    if (field === 'notes' || field === 'tags') return 'ring-2 ring-[#00FF9C]/60'
+    if (fv.confidence === 'extracted') return 'ring-2 ring-[#3B82F6]/70'
+    if (fv.confidence === 'guessed') {
+      return confirmedFields.has(field) ? 'ring-2 ring-[#3B82F6]/70' : 'ring-2 ring-amber-400'
+    }
+    return ''
+  }
+
+  const uploadFiles = useCallback(async (files: Iterable<File>) => {
+    const arr = Array.from(files)
+    if (!arr.length) return
     setUploading(true)
     try {
-      for (const file of Array.from(files)) {
+      for (const file of arr) {
         const fd = new FormData()
         fd.append('file', file)
         const result = await uploadScreenshot(fd)
@@ -120,13 +235,8 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
       }
     } finally {
       setUploading(false)
-      if (fileInputRef.current) fileInputRef.current.value = ''
     }
-  }
-
-  const removeScreenshot = (url: string) => {
-    setScreenshots((prev) => prev.filter((s) => s !== url))
-  }
+  }, [])
 
   const onSubmit = async (data: Record<string, unknown>) => {
     setIsSubmitting(true)
@@ -177,7 +287,85 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      className="space-y-6"
+      onPaste={(e) => {
+        const files = e.clipboardData?.files
+        if (files && files.length) {
+          e.preventDefault()
+          void uploadFiles(files)
+        }
+      }}
+    >
+      {/* Extraction review strip — legend + confirm guessed values */}
+      {importResult && (
+        <div className="space-y-2 rounded-lg border border-zinc-800 bg-[#0A0B0E] p-3">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+            {(
+              [
+                ['Verified from image', 'bg-[#3B82F6]'],
+                ['Guessed — confirm below', 'bg-amber-400'],
+                ['Not found', 'bg-zinc-500'],
+                ['AI draft', 'bg-[#00FF9C]'],
+              ] as const
+            ).map(([label, cls]) => (
+              <span key={label} className="inline-flex items-center gap-1.5 text-xs text-zinc-400">
+                <span className={cn('h-2.5 w-2.5 rounded-full', cls)} />
+                {label}
+              </span>
+            ))}
+            <div className="flex-1" />
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={importing || screenshots.length === 0}
+              onClick={() => runExtraction(screenshots[0])}
+              className="h-6 px-2 text-[11px] text-zinc-400"
+            >
+              Retry
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setImportResult(null)}
+              className="h-6 px-2 text-[11px] text-zinc-400"
+            >
+              Dismiss
+            </Button>
+          </div>
+          {amberFields.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-zinc-400">Tap to confirm:</span>
+              {amberFields.map((f) => {
+                const confirmed = confirmedFields.has(f)
+                return (
+                  <Button
+                    key={f}
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => toggleConfirmField(f)}
+                    className={cn(
+                      'h-6 gap-1 px-2 text-[11px]',
+                      confirmed
+                        ? 'border-[#3B82F6] text-[#3B82F6]'
+                        : 'border-amber-400 text-amber-300',
+                    )}
+                  >
+                    {confirmed && <Check className="h-3 w-3" />}
+                    {IMPORT_FIELD_LABELS[f] ?? f}
+                  </Button>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="text-xs text-[#00FF9C]">All extracted values confirmed.</div>
+          )}
+        </div>
+      )}
       {/* Section 1 — Trade Details */}
       <Card className="border-zinc-800 bg-[#12141A]">
         <CardHeader className="pb-4">
@@ -190,7 +378,7 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
           <div className="space-y-2 sm:col-span-2">
             <Label className="text-zinc-400">Pair</Label>
             <Select value={watchPair} onValueChange={(v) => v && onPairChange(v)}>
-              <SelectTrigger className="border-zinc-800 bg-[#0A0B0E] text-white">
+              <SelectTrigger className={cn('border-zinc-800 bg-[#0A0B0E] text-white', fieldRing('pair'))}>
                 <SelectValue placeholder="Select pair" />
               </SelectTrigger>
               <SelectContent className="border-zinc-800 bg-[#12141A]">
@@ -198,6 +386,14 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
                   Forex
                 </div>
                 {FOREX_PAIRS.map((p) => (
+                  <SelectItem key={p} value={p} className="text-white">
+                    {p}
+                  </SelectItem>
+                ))}
+                <div className="px-2 py-1.5 text-xs font-medium text-zinc-500">
+                  Commodities
+                </div>
+                {COMMODITY_PAIRS.map((p) => (
                   <SelectItem key={p} value={p} className="text-white">
                     {p}
                   </SelectItem>
@@ -239,7 +435,7 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
                   watchDirection === 'long'
                     ? 'border-[#00FF9C] bg-[#00FF9C]/10 text-[#00FF9C]'
                     : 'border-zinc-800 text-zinc-400'
-                }`}
+                } ${fieldRing('direction')}`}
                 onClick={() => setValue('direction', 'long')}
               >
                 <ArrowUpRight className="h-3.5 w-3.5" />
@@ -253,7 +449,7 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
                   watchDirection === 'short'
                     ? 'border-[#FF4D4D] bg-[#FF4D4D]/10 text-[#FF4D4D]'
                     : 'border-zinc-800 text-zinc-400'
-                }`}
+                } ${fieldRing('direction')}`}
                 onClick={() => setValue('direction', 'short')}
               >
                 <ArrowDownRight className="h-3.5 w-3.5" />
@@ -269,7 +465,7 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
               value={watch('session') ?? '__none'}
               onValueChange={(v) => setValue('session', v === '__none' || v === null ? undefined : (v as Session))}
             >
-              <SelectTrigger className="border-zinc-800 bg-[#0A0B0E] text-white">
+              <SelectTrigger className={cn('border-zinc-800 bg-[#0A0B0E] text-white', fieldRing('session'))}>
                 <SelectValue placeholder="Select session" />
               </SelectTrigger>
               <SelectContent className="border-zinc-800 bg-[#12141A]">
@@ -301,7 +497,7 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
             <Input
               type="datetime-local"
               {...register('entry_time')}
-              className="border-zinc-800 bg-[#0A0B0E] text-white"
+              className={cn('border-zinc-800 bg-[#0A0B0E] text-white', fieldRing('entry_time'))}
             />
           </div>
         </CardContent>
@@ -322,7 +518,7 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
               step="any"
               placeholder="0.00"
               {...register('entry_price')}
-              className="border-zinc-800 bg-[#0A0B0E] font-mono text-white"
+              className={cn('border-zinc-800 bg-[#0A0B0E] font-mono text-white', fieldRing('entry_price'))}
             />
             {errors.entry_price && (
               <p className="text-xs text-[#FF4D4D]">
@@ -337,7 +533,7 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
               step="any"
               placeholder="0.00"
               {...register('exit_price')}
-              className="border-zinc-800 bg-[#0A0B0E] font-mono text-white"
+              className={cn('border-zinc-800 bg-[#0A0B0E] font-mono text-white', fieldRing('exit_price'))}
             />
           </div>
           <div className="space-y-2">
@@ -347,7 +543,7 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
               step="any"
               placeholder="0.00"
               {...register('stop_loss')}
-              className="border-zinc-800 bg-[#0A0B0E] font-mono text-white"
+              className={cn('border-zinc-800 bg-[#0A0B0E] font-mono text-white', fieldRing('stop_loss'))}
             />
           </div>
           <div className="space-y-2">
@@ -357,7 +553,7 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
               step="any"
               placeholder="0.00"
               {...register('take_profit')}
-              className="border-zinc-800 bg-[#0A0B0E] font-mono text-white"
+              className={cn('border-zinc-800 bg-[#0A0B0E] font-mono text-white', fieldRing('take_profit'))}
             />
           </div>
           <div className="space-y-2">
@@ -367,7 +563,7 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
               step="any"
               placeholder="0.00"
               {...register('lot_size')}
-              className="border-zinc-800 bg-[#0A0B0E] font-mono text-white"
+              className={cn('border-zinc-800 bg-[#0A0B0E] font-mono text-white', fieldRing('lot_size'))}
             />
           </div>
           {/* Risk:Reward display */}
@@ -404,7 +600,7 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
               value={watch('outcome') ?? '__none'}
               onValueChange={(v) => setValue('outcome', v === '__none' || v === null ? undefined : (v as Outcome))}
             >
-              <SelectTrigger className="border-zinc-800 bg-[#0A0B0E] text-white">
+              <SelectTrigger className={cn('border-zinc-800 bg-[#0A0B0E] text-white', fieldRing('outcome'))}>
                 <SelectValue placeholder="Select outcome" />
               </SelectTrigger>
               <SelectContent className="border-zinc-800 bg-[#12141A]">
@@ -433,7 +629,7 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
               step="any"
               placeholder="0.00"
               {...register('pnl_usd')}
-              className="border-zinc-800 bg-[#0A0B0E] font-mono text-white"
+              className={cn('border-zinc-800 bg-[#0A0B0E] font-mono text-white', fieldRing('pnl_usd'))}
             />
           </div>
           <div className="space-y-2">
@@ -451,7 +647,7 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
             <Input
               type="datetime-local"
               {...register('exit_time')}
-              className="border-zinc-800 bg-[#0A0B0E] text-white"
+              className={cn('border-zinc-800 bg-[#0A0B0E] text-white', fieldRing('exit_time'))}
             />
           </div>
         </CardContent>
@@ -471,7 +667,7 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
               placeholder="Trade rationale, observations…"
               rows={4}
               {...register('notes')}
-              className="border-zinc-800 bg-[#0A0B0E] text-white placeholder:text-zinc-600"
+              className={cn('border-zinc-800 bg-[#0A0B0E] text-white placeholder:text-zinc-600', fieldRing('notes'))}
             />
           </div>
           <div className="space-y-2">
@@ -479,7 +675,7 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
             <Input
               placeholder="trend-follow, breakout, news-trade"
               {...register('tags')}
-              className="border-zinc-800 bg-[#0A0B0E] text-white placeholder:text-zinc-600"
+              className={cn('border-zinc-800 bg-[#0A0B0E] text-white placeholder:text-zinc-600', fieldRing('tags'))}
             />
           </div>
 
@@ -487,12 +683,25 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
           <div className="space-y-2">
             <Label className="text-zinc-400">Screenshots</Label>
             <div
-              className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-zinc-800 bg-[#0A0B0E] px-6 py-8 transition-colors hover:border-zinc-700"
+              className={cn(
+                'flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-8 transition-colors',
+                isDragging
+                  ? 'border-[#00FF9C] bg-[#00FF9C]/10'
+                  : 'border-zinc-800 bg-[#0A0B0E] hover:border-zinc-700',
+              )}
               onClick={() => fileInputRef.current?.click()}
+              onDragOver={(e) => { e.preventDefault() }}
+              onDragEnter={(e) => { e.preventDefault(); setIsDragging(true) }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault()
+                setIsDragging(false)
+                void uploadFiles(e.dataTransfer.files)
+              }}
             >
               <Upload className="mb-2 h-6 w-6 text-zinc-500" />
               <p className="text-sm text-zinc-400">
-                {uploading ? 'Uploading…' : 'Click or drag to upload screenshots'}
+                {uploading ? 'Uploading…' : isDragging ? 'Drop images here' : 'Click, drag, or paste screenshots'}
               </p>
               <p className="text-xs text-zinc-600">PNG, JPG up to 5MB</p>
             </div>
@@ -533,6 +742,28 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
           </div>
         </CardContent>
       </Card>
+
+          {/* Extract trade details */}
+          {screenshots.length > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => runExtraction(screenshots[0])}
+              disabled={importing}
+              className="w-full border-[#00FF9C]/40 text-[#00FF9C] hover:bg-[#00FF9C]/10"
+            >
+              {importing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Reading screenshot…
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" /> Extract trade details
+                </>
+              )}
+            </Button>
+          )}
+
 
       {/* Submit */}
       <div className="flex justify-end gap-3">

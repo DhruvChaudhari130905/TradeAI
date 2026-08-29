@@ -13,7 +13,20 @@ import { Play, Trash2 } from 'lucide-react'
 import type { IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-charts'
 import type { Candle, DrawingKind, DrawingPoint, DrawingShape } from '@/lib/types/replay'
 import { toChartTime } from '@/lib/replay/time'
-import { pipSize } from '@/lib/replay/execution'
+import { pipSize, priceDigits } from '@/lib/replay/execution'
+import {
+  anchorHandleHit as anchorHandleHitImpl,
+  axisLock,
+  extendRay,
+  FIB_LEVELS,
+  getResizeCursor,
+  getResizeHandles,
+  HANDLE_RADIUS,
+  handleResizeDrag,
+  hitTestShapes,
+  supportsResizeKnobs,
+  type Pixel,
+} from '@/lib/replay/drawing-geometry'
 import { newId } from '@/lib/replay/simulation'
 
 export type DrawTool = DrawingKind | 'eraser'
@@ -27,7 +40,6 @@ export const DRAW_TOOLS: DrawTool[] = [
 
 const LINE_COLOR = '#38BDF8'
 const FIB_COLOR = '#D4A24E'
-const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1]
 const HIT_RADIUS = 8
 const POSITION_RR = 2 // default take-profit = 2× the drawn stop distance
 
@@ -47,14 +59,10 @@ interface DrawingOverlayProps {
   onExecute: (shape: DrawingShape) => void
 }
 
-interface Pixel {
-  x: number
-  y: number
-}
 
 /** Active edit gesture (capture-phase drag in cursor mode) */
 interface EditDrag {
-  mode: 'body' | 'anchor' | 'tp'
+  mode: 'body' | 'anchor' | 'tp' | 'resize'
   shape: DrawingShape // frozen snapshot at drag start — deltas stay relative to it
   anchorIndex: number
   startPixel: Pixel
@@ -94,13 +102,13 @@ function drawPositionPlan(
   const xEnd = Math.min(x0 + width, size.w)
 
   // Zones
-  ctx.fillStyle = 'rgba(255, 77, 77, 0.15)'
+  ctx.fillStyle = 'rgba(255, 77, 77, 0.32)'
   ctx.fillRect(x0, Math.min(entryY, slY), xEnd - x0, Math.abs(slY - entryY))
-  ctx.fillStyle = 'rgba(0, 255, 156, 0.12)'
+  ctx.fillStyle = 'rgba(0, 255, 156, 0.20)'
   ctx.fillRect(x0, Math.min(entryY, tpY), xEnd - x0, Math.abs(tpY - entryY))
 
   // Level lines
-  const digits = market === 'crypto' ? 2 : pair.includes('JPY') ? 3 : 5
+  const digits = priceDigits(pair, market)
   ctx.lineWidth = 1.5
   ctx.strokeStyle = '#FF4D4D'
   ctx.beginPath(); ctx.moveTo(x0, slY); ctx.lineTo(xEnd, slY); ctx.stroke()
@@ -254,13 +262,6 @@ export function DrawingOverlay({
   // ── Geometry helpers ──
 
   /** Extend p0→dir infinitely toward the right edge */
-  function extendRay(p0: Pixel, dir: Pixel, w: number): Pixel {
-    const dx = dir.x - p0.x
-    const dy = dir.y - p0.y
-    if (dx === 0 && dy === 0) return dir
-    const scale = (w * 2) / Math.hypot(dx, dy)
-    return { x: p0.x + dx * scale, y: p0.y + dy * scale }
-  }
 
   // ── Shape rendering ──
 
@@ -476,19 +477,21 @@ export function DrawingOverlay({
     if (!activeTool && !dragShape && selectedId) {
       const sel = drawings.find((d) => d.id === selectedId)
       if (sel && sel.kind !== 'measure') {
-        const drawHandle = (px: Pixel, color: string) => {
+        const drawHandle = (px: Pixel, color: string, isResize = false) => {
           ctx.beginPath()
-          ctx.arc(px.x, px.y, 4.5, 0, Math.PI * 2)
+          ctx.arc(px.x, px.y, isResize ? 6 : 4.5, 0, Math.PI * 2)
           ctx.fillStyle = '#FFFFFF'
           ctx.fill()
           ctx.strokeStyle = color
-          ctx.lineWidth = 1.5
+          ctx.lineWidth = isResize ? 2 : 1.5
           ctx.stroke()
         }
+        // Anchor point handles
         for (const p of sel.points) {
           const px = toPixels(p)
           if (px) drawHandle(px, sel.color ?? LINE_COLOR)
         }
+        // TP handle for position plans
         if (sel.kind === 'long_position' || sel.kind === 'short_position') {
           const tpPx = toPixels({ time: sel.points[1]?.time ?? sel.points[0].time, price: sel.tpPrice ?? sel.points[0].price })
           if (tpPx) {
@@ -506,6 +509,21 @@ export function DrawingOverlay({
             }
           }
         }
+        // Resize knobs (4 corners/edges) for supported shapes
+        if (supportsResizeKnobs(sel.kind)) {
+          const pts = sel.points.map(toPixels)
+          if (pts.every((p) => p !== null)) {
+            const pp = pts as Pixel[]
+            const tpY = sel.kind === 'long_position' || sel.kind === 'short_position'
+              ? priceToY(sel.tpPrice ?? sel.points[0].price)
+              : null
+            const handles = getResizeHandles(sel, pp, size, tpY)
+            for (const h of handles) {
+              const handleColor = h.type === 'corner' ? '#00FF9C' : '#38BDF8'
+              drawHandle({ x: h.x, y: h.y }, handleColor, true)
+            }
+          }
+        }
       }
     }
 
@@ -514,10 +532,30 @@ export function DrawingOverlay({
     if (pend.length > 0 && preview) {
       const first = toPixels(pend[0])
       if (first) {
-        ctx.strokeStyle = LINE_COLOR
-        ctx.setLineDash([4, 4])
-        ctx.lineWidth = 1
-        if (activeTool === 'rect' || activeTool === 'price_range') {
+        // Live position-plan preview: entry at the first click, SL under the
+        // cursor, TP mirrored at 2R — zones render before commit
+        if (activeTool === 'long_position' || activeTool === 'short_position') {
+          const slPrice = priceAtY(preview.y)
+          const entry = pend[0].price
+          if (slPrice !== null) {
+            const slDist = Math.abs(entry - slPrice)
+            const tp = activeTool === 'long_position' ? entry + slDist * POSITION_RR : entry - slDist * POSITION_RR
+            const idx = Math.max(0, Math.min(candles.length - 1, candleIndexAtX(preview.x)))
+            const tmp: DrawingShape = {
+              id: 'preview',
+              kind: activeTool,
+              points: [pend[0], { time: candles[idx]?.time ?? pend[0].time, price: slPrice }],
+              tpPrice: tp,
+            }
+            const px0 = toPixels(tmp.points[0])
+            const px1 = toPixels(tmp.points[1])
+            if (px0 && px1) drawPositionPlan(ctx, tmp, [px0, px1], size, priceToY, market, pair)
+          }
+        } else {
+          ctx.strokeStyle = LINE_COLOR
+          ctx.setLineDash([4, 4])
+          ctx.lineWidth = 1
+          if (activeTool === 'rect' || activeTool === 'price_range') {
           ctx.strokeRect(Math.min(first.x, preview.x), Math.min(first.y, preview.y),
             Math.abs(preview.x - first.x), Math.abs(preview.y - first.y))
         } else if (pend.length >= 2) {
@@ -540,6 +578,7 @@ export function DrawingOverlay({
           ctx.stroke()
         }
         ctx.setLineDash([])
+        }
       }
     }
 
@@ -566,7 +605,7 @@ export function DrawingOverlay({
       ? drawings.find((d) => d.id === selectedId && (d.kind === 'long_position' || d.kind === 'short_position'))
       : null
     setBadgePos(sel ? toPixels(sel.points[0]) : null)
-  }, [drawings, dragShape, selectedId, preview, measureTo, size, rangeTick, candles, activeTool, drawShape, toPixels, pair, market])
+  }, [drawings, dragShape, selectedId, preview, measureTo, size, rangeTick, candles, activeTool, drawShape, toPixels, priceToY, candleIndexAtX, priceAtY, pair, market])
 
   // ── Pointer handling ──
 
@@ -655,108 +694,9 @@ export function DrawingOverlay({
   }
 
   /** Distance-based hit test against rendered geometry; returns shape id */
+  /** Distance-based hit test against rendered geometry; delegates to the pure geometry module */
   function hitTest(pos: Pixel, opts?: { skipMeasure?: boolean }): string | null {
-    for (let i = drawings.length - 1; i >= 0; i--) {
-      const shape = drawings[i]
-      if (opts?.skipMeasure && shape.kind === 'measure') continue
-      const pts = shape.points.map(toPixels)
-      if (pts.some((p) => p === null)) continue
-      const pp = pts as Pixel[]
-      let hit = false
-      switch (shape.kind) {
-        case 'hline':
-        case 'hray':
-          hit = pos.x >= pp[0].x - HIT_RADIUS && Math.abs(pp[0].y - pos.y) < HIT_RADIUS
-          break
-        case 'vline':
-        case 'vray':
-          hit = pos.y <= pp[0].y + HIT_RADIUS && Math.abs(pp[0].x - pos.x) < HIT_RADIUS
-          break
-        case 'trendline':
-        case 'measure':
-        case 'arrow':
-          hit = distToSegment(pos, pp[0], pp[1]) < HIT_RADIUS
-          break
-        case 'ray': {
-          const far = extendRay(pp[0], pp[1], size.w)
-          hit = distToSegment(pos, pp[0], far) < HIT_RADIUS
-          break
-        }
-        case 'channel': {
-          const dx = pp[1].x - pp[0].x
-          const dy = pp[1].y - pp[0].y
-          hit =
-            distToSegment(pos, pp[0], pp[1]) < HIT_RADIUS ||
-            distToSegment(pos, { x: pp[0].x + dx, y: pp[0].y + dy }, { x: pp[1].x + dx, y: pp[1].y + dy }) < HIT_RADIUS
-          break
-        }
-        case 'pitchfork': {
-          const [a, b, c] = pp
-          const mx = (b.x + c.x) / 2
-          const my = (b.y + c.y) / 2
-          const farM = extendRay(a, { x: mx, y: my }, size.w)
-          hit =
-            distToSegment(pos, a, farM) < HIT_RADIUS ||
-            distToSegment(pos, b, { x: farM.x + b.x - mx, y: farM.y + b.y - my }) < HIT_RADIUS ||
-            distToSegment(pos, c, { x: farM.x + c.x - mx, y: farM.y + c.y - my }) < HIT_RADIUS ||
-            distToSegment(pos, a, b) < HIT_RADIUS ||
-            distToSegment(pos, a, c) < HIT_RADIUS
-          break
-        }
-        case 'rect': {
-          const x1 = Math.min(pp[0].x, pp[1].x)
-          const x2 = Math.max(pp[0].x, pp[1].x)
-          const y1 = Math.min(pp[0].y, pp[1].y)
-          const y2 = Math.max(pp[0].y, pp[1].y)
-          hit = pos.x >= x1 && pos.x <= x2 && pos.y >= y1 && pos.y <= y2
-          break
-        }
-        case 'price_range': {
-          const x1 = Math.min(pp[0].x, pp[1].x)
-          const x2 = Math.max(pp[0].x, pp[1].x)
-          const y1 = Math.min(pp[0].y, pp[1].y)
-          const y2 = Math.max(pp[0].y, pp[1].y)
-          hit = pos.x >= x1 && pos.x <= x2 && pos.y >= y1 && pos.y <= y2
-          break
-        }
-        case 'fib': {
-          const [a, b] = shape.points
-          const x1 = Math.min(pp[0].x, pp[1].x)
-          const x2 = Math.max(pp[0].x, pp[1].x)
-          if (pos.x >= x1 && pos.x <= x2) {
-            for (const level of FIB_LEVELS) {
-              const price = a.price + (b.price - a.price) * level
-              const y = priceToY(price)
-              if (y !== null && Math.abs(y - pos.y) < 6) {
-                hit = true
-                break
-              }
-            }
-          }
-          break
-        }
-        case 'text': {
-          const w = (shape.label?.length ?? 4) * 6.6 + 8
-          hit = pos.x >= pp[0].x - 4 && pos.x <= pp[0].x + w && pos.y >= pp[0].y - 14 && pos.y <= pp[0].y + 4
-          break
-        }
-        case 'long_position':
-        case 'short_position': {
-          const entryY = priceToY(shape.points[0].price)
-          const slY = priceToY(shape.points[1].price)
-          const tpY = priceToY(shape.tpPrice ?? shape.points[0].price)
-          if (entryY === null || slY === null || tpY === null) break
-          const x0 = pp[0].x
-          const x2 = Math.max(pp[0].x + 90, pp[1].x)
-          const top = Math.min(entryY, slY, tpY)
-          const bottom = Math.max(entryY, slY, tpY)
-          hit = pos.x >= x0 - HIT_RADIUS && pos.x <= x2 + HIT_RADIUS && pos.y >= top - HIT_RADIUS && pos.y <= bottom + HIT_RADIUS
-          break
-        }
-      }
-      if (hit) return shape.id
-    }
-    return null
+    return hitTestShapes(drawings, pos, { toPixels, priceToY, hitRadius: HIT_RADIUS, size }, opts)
   }
 
   // ── Edit interactions: select / drag body / drag anchors / TP handle ──
@@ -764,20 +704,11 @@ export function DrawingOverlay({
   // drawing grab blocks chart pan and the SL/TP overlay, everything else
   // falls through.
 
-  const HANDLE_RADIUS = 10
 
-  /** Handle under pos on shape: an anchor point or the position-plan TP */
-  function anchorHandleHit(pos: Pixel, shape: DrawingShape): { mode: 'anchor' | 'tp'; index: number } | null {
-    if (shape.kind === 'measure') return null
-    for (let i = 0; i < shape.points.length; i++) {
-      const px = toPixels(shape.points[i])
-      if (px && Math.hypot(px.x - pos.x, px.y - pos.y) <= HANDLE_RADIUS) return { mode: 'anchor', index: i }
-    }
-    if (shape.kind === 'long_position' || shape.kind === 'short_position') {
-      const tpPx = toPixels({ time: shape.points[1]?.time ?? shape.points[0].time, price: shape.tpPrice ?? shape.points[0].price })
-      if (tpPx && Math.hypot(tpPx.x - pos.x, tpPx.y - pos.y) <= HANDLE_RADIUS + 2) return { mode: 'tp', index: -1 }
-    }
-    return null
+  /** Handle under pos on shape: an anchor point, the position-plan TP, or a resize knob */
+  /** Handle under pos on shape: anchor point, position-plan TP, or resize knob */
+  function anchorHandleHit(pos: Pixel, shape: DrawingShape): { mode: 'anchor' | 'tp' | 'resize'; index: number } | null {
+    return anchorHandleHitImpl(pos, shape, { toPixels, priceToY, hitRadius: HANDLE_RADIUS, size })
   }
 
   useEffect(() => {
@@ -789,14 +720,8 @@ export function DrawingOverlay({
       return { x: e.clientX - rect.left, y: e.clientY - rect.top }
     }
 
-    /** Kinds whose whole-body move is locked to one axis */
-    function axisLock(kind: DrawingKind): 'lockX' | 'lockY' | null {
-      if (kind === 'hline' || kind === 'hray' || kind === 'text') return 'lockX'
-      if (kind === 'vline' || kind === 'vray') return 'lockY'
-      return null
-    }
 
-    function beginDrag(mode: 'body' | 'anchor' | 'tp', shape: DrawingShape, anchorIndex: number, pos: Pixel, e: PointerEvent) {
+    function beginDrag(mode: 'body' | 'anchor' | 'tp' | 'resize', shape: DrawingShape, anchorIndex: number, pos: Pixel, e: PointerEvent) {
       editDragRef.current = {
         mode,
         shape: JSON.parse(JSON.stringify(shape)) as DrawingShape, // frozen snapshot — deltas stay relative to it
@@ -814,6 +739,9 @@ export function DrawingOverlay({
     }
 
     function onPointerDown(e: PointerEvent) {
+      // Clicks on the floating badge/text editor are DOM UI, not chart picks —
+      // let them reach the button instead of clearing selection / dragging
+      if ((e.target as HTMLElement | null)?.closest?.('[data-drawing-badge]')) return
       if (activeTool !== null || e.button !== 0) return
       const pos = local(e)
 
@@ -850,14 +778,17 @@ export function DrawingOverlay({
         if (activeTool === null) {
           const sel = drawings.find((d) => d.id === selectedId)
           let cursor = ''
-          if (sel && anchorHandleHit(pos, sel)) cursor = 'pointer'
-          else if (hitTest(pos, { skipMeasure: true })) cursor = 'grab'
+          if (sel && anchorHandleHit(pos, sel)) {
+            const hit = anchorHandleHit(pos, sel)
+            if (hit?.mode === 'resize') cursor = getResizeCursor(hit.index, sel.kind)
+            else cursor = 'pointer'
+          } else if (hitTest(pos, { skipMeasure: true })) cursor = 'grab'
           container!.style.cursor = cursor
         }
         return
       }
 
-      container!.style.cursor = 'grabbing'
+      container!.style.cursor = drag.mode === 'resize' ? getResizeCursor(drag.anchorIndex, drag.shape.kind) : 'grabbing'
       const price = priceAtY(pos.y)
       if (price === null) return
       const dPrice = price - drag.startPrice
@@ -880,6 +811,8 @@ export function DrawingOverlay({
           price: lock === 'lockY' ? orig.price : orig.price + dPrice,
         }
         next = { ...drag.shape, points: pts }
+      } else if (drag.mode === 'resize') {
+        next = handleResizeDrag(drag.shape, drag.anchorIndex, pos, drag.startPixel, candles, timeToX, priceToY, lock, candleIndexAtX, priceAtY)
       } else {
         // Whole-shape move: every point shifts by the same bar/price delta
         const pts = drag.shape.points.map((p) => {
@@ -926,19 +859,31 @@ export function DrawingOverlay({
       })
     }
 
+    // Right-click on any drawing deletes it in place, regardless of active tool
+    function onContextMenu(e: MouseEvent) {
+      e.preventDefault()
+      const pos = local(e)
+      const id = hitTest(pos)
+      if (!id) return
+      onErase(id)
+      if (selectedId === id) setSelectedId(null)
+    }
+
     container.addEventListener('pointerdown', onPointerDown, true)
     container.addEventListener('pointermove', onPointerMove, true)
     container.addEventListener('pointerup', onPointerUp, true)
     container.addEventListener('dblclick', onDoubleClick, true)
+    container.addEventListener('contextmenu', onContextMenu)
     return () => {
       container.removeEventListener('pointerdown', onPointerDown, true)
       container.removeEventListener('pointermove', onPointerMove, true)
       container.removeEventListener('pointerup', onPointerUp, true)
       container.removeEventListener('dblclick', onDoubleClick, true)
+      container.removeEventListener('contextmenu', onContextMenu)
     }
     // anchorHandleHit/hitTest are plain per-render functions; `drawings` covers them
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drawings, selectedId, activeTool, candles, candleIndexAtX, priceAtY, timeAtIdx, toPixels, onEdit])
+  }, [drawings, selectedId, activeTool, candles, candleIndexAtX, priceAtY, timeAtIdx, toPixels, onEdit, onErase])
 
   // Keyboard: Delete/Backspace removes selected, Escape deselects
   useEffect(() => {
@@ -974,9 +919,17 @@ export function DrawingOverlay({
     setTextDraft(null)
   }
 
-  const selectedShape = drawings.find(
-    (d) => d.id === selectedId && (d.kind === 'long_position' || d.kind === 'short_position'),
-  )
+  const selectedShape = drawings.find((d) => d.id === selectedId)
+
+  // Badge position for any selected drawing
+  const anyBadgePos = selectedId
+    ? (() => {
+        const sel = drawings.find((d) => d.id === selectedId)
+        if (!sel) return null
+        const p0 = toPixels(sel.points[0])
+        return p0
+      })()
+    : null
 
   return (
     <>
@@ -988,25 +941,28 @@ export function DrawingOverlay({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
       />
-      {!interactive && selectedShape && badgePos && (
+      {selectedShape && anyBadgePos && (
         <div
+          data-drawing-badge
           className="absolute z-30 flex items-center gap-1 rounded-md border border-[#27272A] bg-[#12141A]/95 px-1 py-1 shadow-lg"
-          style={{ left: Math.max(4, Math.min(badgePos.x, size.w - 150)), top: Math.max(4, badgePos.y - 40) }}
+          style={{ left: Math.max(4, Math.min(anyBadgePos.x, size.w - 180)), top: Math.max(4, anyBadgePos.y - 40) }}
         >
+          {selectedShape.kind === 'long_position' || selectedShape.kind === 'short_position' ? (
+            <button
+              type="button"
+              className="flex items-center gap-1 rounded bg-[#00FF9C] px-2 py-1 text-[11px] font-bold text-[#0A0B0E] hover:bg-[#00FF9C]/85"
+              onClick={() => {
+                onExecute(selectedShape)
+                setSelectedId(null)
+              }}
+            >
+              <Play className="h-3 w-3" /> Execute {selectedShape.kind === 'long_position' ? 'Long' : 'Short'}
+            </button>
+          ) : null}
           <button
             type="button"
-            className="flex items-center gap-1 rounded bg-[#00FF9C] px-2 py-1 text-[11px] font-bold text-[#0A0B0E] hover:bg-[#00FF9C]/85"
-            onClick={() => {
-              onExecute(selectedShape)
-              setSelectedId(null)
-            }}
-          >
-            <Play className="h-3 w-3" /> Execute {selectedShape.kind === 'long_position' ? 'Long' : 'Short'}
-          </button>
-          <button
-            type="button"
-            title="Delete plan"
-            aria-label="Delete plan"
+            title="Delete drawing"
+            aria-label="Delete drawing"
             className="flex h-6 w-6 items-center justify-center rounded text-zinc-400 hover:bg-[#FF4D4D]/10 hover:text-[#FF4D4D]"
             onClick={() => {
               onErase(selectedShape.id)
@@ -1019,6 +975,7 @@ export function DrawingOverlay({
       )}
       {textDraft && (
         <div
+          data-drawing-badge
           className="absolute z-40 flex items-center gap-1 rounded-md border border-[#27272A] bg-[#12141A]/95 p-1 shadow-lg"
           style={{
             left: Math.max(4, Math.min(textDraft.x, Math.max(4, size.w - 200))),
@@ -1060,7 +1017,6 @@ export function DrawingOverlay({
 }
 
 // ── Helpers ──
-
 function drawArrowHead(ctx: CanvasRenderingContext2D, from: Pixel, to: Pixel) {
   const angle = Math.atan2(to.y - from.y, to.x - from.x)
   const len = 10
@@ -1084,19 +1040,10 @@ function drawLabel(ctx: CanvasRenderingContext2D, x: number, y: number, text: st
 function measureLabel(a: DrawingPoint, b: DrawingPoint, _candles: Candle[], pair: string, market: 'forex' | 'crypto'): string {
   const ps = pipSize(pair, market)
   const pips = Math.abs(a.price - b.price) / ps
-  const digits = market === 'crypto' ? 2 : pair.includes('JPY') ? 3 : 5
+  const digits = priceDigits(pair, market)
   return `${pips.toFixed(1)} pips · ${(b.price - a.price >= 0 ? '+' : '')}${(b.price - a.price).toFixed(digits)}`
 }
 
-function distToSegment(p: Pixel, a: Pixel, b: Pixel): number {
-  const dx = b.x - a.x
-  const dy = b.y - a.y
-  const lenSq = dx * dx + dy * dy
-  if (lenSq === 0) return Math.hypot(p.x - a.x, p.y - a.y)
-  let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq
-  t = Math.max(0, Math.min(1, t))
-  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy))
-}
 
 function hexToRgba(hex: string, alpha: number): string {
   const r = parseInt(hex.slice(1, 3), 16)
@@ -1106,5 +1053,5 @@ function hexToRgba(hex: string, alpha: number): string {
 }
 
 function formatPrice(price: number, market: 'forex' | 'crypto', pair: string): string {
-  return market === 'crypto' ? price.toFixed(2) : pair.includes('JPY') ? price.toFixed(3) : price.toFixed(5)
+  return price.toFixed(priceDigits(pair, market))
 }

@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { tradeSubmitSchema, type TradeFormData } from '@/lib/types/trade'
+import type { TradeImageExtraction } from '@/lib/nim/trade-extract-types'
 import { revalidatePath } from 'next/cache'
 
 type ActionResult<T> =
@@ -269,3 +270,24 @@ export async function getTrade(id: string) {
     return { success: false as const, error: 'Something went wrong.' }
   }
 }
+
+export async function extractTradeFromScreenshot(
+  screenshotUrl: string,
+): Promise<ActionResult<TradeImageExtraction>> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { success: false, error: 'Not authenticated' }
+    }
+
+    const { extractTradeFromImageUrl } = await import('@/lib/nim/extract-trade-from-image')
+    const extraction = await extractTradeFromImageUrl(screenshotUrl)
+    return { success: true, data: extraction }
+  } catch (error) {
+    console.error('[extractTradeFromScreenshot]', error)
+    const message = error instanceof Error ? error.message : 'Something went wrong.'
+    return { success: false, error: message }
+  }
+}
+

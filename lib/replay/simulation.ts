@@ -24,6 +24,9 @@ export interface SimConfig {
   market: 'forex' | 'crypto'
   leverage: number
   spreadPips: number
+  /** Optional deterministic id generator (tests inject a counter; live uses
+   *  the default time-based newId). salt distinguishes role + bar. */
+  makeId?: (salt: string) => string
 }
 
 export interface SimBar {
@@ -53,6 +56,11 @@ export function newId(): string {
   return `r${Date.now().toString(36)}${idCounter}`
 }
 
+/** Id for a new entity: injected factory when cfg provides one, else newId() */
+function mkId(cfg: SimConfig | undefined, salt: string): string {
+  return cfg?.makeId ? cfg.makeId(salt) : newId()
+}
+
 // ── Actions (pure) ────────────────────────────────────────────────────────────
 
 export function openMarketPosition(
@@ -72,14 +80,14 @@ export function openMarketPosition(
   const equity = state.balance + state.positions.reduce(
     (sum, p) => sum + floatingPnl(p, mid, cfg.pair, cfg.market), 0,
   )
-  const used = usedMargin(state.positions, cfg.leverage, cfg.market)
-  const need = marginFor(entry, lots, cfg.leverage, cfg.market)
+  const used = usedMargin(state.positions, cfg.leverage, cfg.market, cfg.pair)
+  const need = marginFor(entry, lots, cfg.leverage, cfg.market, cfg.pair)
   if (equity - used < need) {
     return { state, event: 'Order rejected: not enough free margin.' }
   }
 
   const position: ReplayPosition = {
-    id: newId(),
+    id: mkId(cfg, `pos:${bar.time}`),
     direction,
     lotSize: roundLots(lots),
     initialLots: roundLots(lots),
@@ -99,10 +107,11 @@ export function placeOrder(
   state: SimState,
   order: Omit<PendingOrder, 'id' | 'createdAt'>,
   bar: SimBar,
+  cfg?: SimConfig,
 ): SimState {
   return {
     ...state,
-    orders: [...state.orders, { ...order, id: newId(), createdAt: bar.time }],
+    orders: [...state.orders, { ...order, id: mkId(cfg, `ord:${bar.time}`), createdAt: bar.time }],
   }
 }
 
@@ -182,7 +191,7 @@ export function closeLots(
   const totalPnl = Math.round((partialsPnl + pnlUsd) * 100) / 100
   const totalPips = pnlPips // pips reported from the final exit leg
   const closed: ClosedReplayTrade = {
-    id: newId(),
+    id: mkId(cfg, `closed:${exitTime}:${position.id}`),
     direction: position.direction,
     entryPrice: position.entryPrice,
     entryTime: position.entryTime,
@@ -244,8 +253,8 @@ export function processBar(
     const equity = s.balance + s.positions.reduce(
       (sum, p) => sum + floatingPnl(p, bar.close, cfg.pair, cfg.market), 0,
     )
-    const used = usedMargin(s.positions, cfg.leverage, cfg.market)
-    const need = marginFor(order.price, order.lotSize, cfg.leverage, cfg.market)
+    const used = usedMargin(s.positions, cfg.leverage, cfg.market, cfg.pair)
+    const need = marginFor(order.price, order.lotSize, cfg.leverage, cfg.market, cfg.pair)
     if (equity - used < need) {
       events.push('Pending order cancelled: not enough free margin at fill.')
       continue
@@ -257,7 +266,7 @@ export function processBar(
       positions: [
         ...s.positions,
         {
-          id: newId(),
+          id: mkId(cfg, `pos:${bar.time}`),
           direction,
           lotSize: order.lotSize,
           initialLots: order.lotSize,
@@ -323,7 +332,7 @@ export function processBar(
   const equity = s.balance + s.positions.reduce(
     (sum, p) => sum + floatingPnl(p, bar.close, cfg.pair, cfg.market), 0,
   )
-  const used = usedMargin(s.positions, cfg.leverage, cfg.market)
+  const used = usedMargin(s.positions, cfg.leverage, cfg.market, cfg.pair)
   if (isStopOut(equity, used)) {
     for (const position of [...s.positions]) {
       const side = position.direction === 'long' ? 'sell' : 'buy'
