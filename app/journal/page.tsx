@@ -314,16 +314,42 @@ export default function JournalPage() {
                     : '—'}
                 </Badge>
 
-                {/* Entry time */}
+                {/* Entry time — backtest trades show the replay (data) time plus when it was actually logged */}
                 <span className="hidden w-36 text-sm text-zinc-400 sm:inline">
-                  {trade.entry_time
-                    ? new Date(trade.entry_time).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })
-                    : '—'}
+                  {trade.source === 'backtest' ? (
+                    <span className="flex flex-col leading-tight">
+                      <span>
+                        {trade.entry_time
+                          ? new Date(trade.entry_time).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
+                          : '—'}
+                      </span>
+                      <span className="text-[11px] text-zinc-600">
+                        Logged{' '}
+                        {trade.created_at
+                          ? new Date(trade.created_at).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
+                          : '—'}
+                      </span>
+                    </span>
+                  ) : trade.entry_time ? (
+                    new Date(trade.entry_time).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })
+                  ) : (
+                    '—'
+                  )}
                 </span>
 
                 {/* PnL */}

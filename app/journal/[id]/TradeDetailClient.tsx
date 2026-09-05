@@ -199,12 +199,12 @@ export function TradeDetailClient({ trade }: TradeDetailClientProps) {
               />
               <Field label="PnL (Pips)" value={trade.pnl_pips != null ? formatNum(trade.pnl_pips, 1) : '—'} mono />
               <Field
-                label="Entry Time"
+                label={trade.source === 'backtest' ? 'Replay Entry Time' : 'Entry Time'}
                 value={formatDate(trade.entry_time)}
                 icon={<Clock className="h-3.5 w-3.5 text-zinc-500" />}
               />
               <Field
-                label="Exit Time"
+                label={trade.source === 'backtest' ? 'Replay Exit Time' : 'Exit Time'}
                 value={formatDate(trade.exit_time)}
                 icon={<Clock className="h-3.5 w-3.5 text-zinc-500" />}
               />
@@ -214,7 +214,10 @@ export function TradeDetailClient({ trade }: TradeDetailClientProps) {
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Market" value={trade.market.toUpperCase()} />
                 <Field label="Session" value={trade.session ? trade.session.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : '—'} />
-                <Field label="Created" value={formatDate(trade.created_at)} />
+                <Field
+                  label={trade.source === 'backtest' ? 'Logged (Real Time)' : 'Created'}
+                  value={formatDate(trade.created_at)}
+                />
                 <Field label="Updated" value={formatDate(trade.updated_at)} />
               </div>
             </div>

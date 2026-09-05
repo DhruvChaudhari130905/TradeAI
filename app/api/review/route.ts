@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service-client'
-import { getNimClient, NIM_MODEL, NIM_FALLBACK_MODEL } from '@/lib/nim/client'
+import { getNimClient, NIM_MODEL_VISION, NIM_REQUEST_TIMEOUT_MS } from '@/lib/nim/client'
 import { parseNimJson } from '@/lib/nim/parse-nim-json'
+import { base64FromUrl } from '@/lib/nim/extract-trade-from-image'
 import { buildTradeContext } from '@/lib/nim/build-trade-context'
 import {
   PROP_FIRM_EVALUATOR_PROMPT,
@@ -80,11 +81,11 @@ export async function POST(request: Request) {
         }
         const systemPrompt = buildReviewSystemPrompt(prompt)
         try {
-          return { key, review: await callNim(systemPrompt, tradeContext) }
+          return { key, review: await callNim(systemPrompt, tradeContext, trade.screenshot_urls) }
         } catch {
-          // Retry once with fallback model
+          // Retry once with fallback model (text-only — drop screenshots)
           try {
-            return { key, review: await callNim(systemPrompt, tradeContext, NIM_FALLBACK_MODEL) }
+            return { key, review: await callNim(systemPrompt, tradeContext, null) }
           } catch (error) {
             console.error(`[api/review] ${key} failed after retry:`, error)
             return { key, review: null }
@@ -144,20 +145,50 @@ export async function POST(request: Request) {
   }
 }
 
+/** Review with the vision model. When the trade has chart screenshots, they are
+ *  attached as images so the reviewer judges the actual setup, not just numbers. */
 async function callNim(
   systemPrompt: string,
   tradeContext: string,
-  model: string = NIM_MODEL,
+  screenshotUrls: string[] | null | undefined,
 ): Promise<PersonalityReview> {
-  const completion = await getNimClient().chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: tradeContext },
-    ],
-    max_tokens: 2048,
-    temperature: 0.3,
-  })
+  // Attach up to 3 screenshots; gracefully skip ones that fail to load
+  const images: Array<Record<string, unknown>> = []
+  if (screenshotUrls && screenshotUrls.length > 0) {
+    const loaded = await Promise.allSettled(
+      screenshotUrls.slice(0, 3).map(async (url) => ({
+        type: 'image_url' as const,
+        image_url: { url: `data:image/jpeg;base64,${await base64FromUrl(url)}` },
+      })),
+    )
+    for (const r of loaded) {
+      if (r.status === 'fulfilled') images.push(r.value)
+    }
+  }
+
+  const userContent =
+    images.length > 0
+      ? [
+          {
+            type: 'text' as const,
+            text: `${tradeContext}\n\n[SCREENSHOTS] The trade's chart screenshots follow. Use them to judge the setup itself — entry location, level quality, stop placement, context — not just the numbers above.`,
+          },
+          ...images,
+        ]
+      : tradeContext
+
+  const completion = await getNimClient().chat.completions.create(
+    {
+      model: NIM_MODEL_VISION,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userContent as never },
+      ],
+      max_tokens: 2048,
+      temperature: 0.3,
+    },
+    { timeout: NIM_REQUEST_TIMEOUT_MS },
+  )
 
   const raw = completion.choices[0]?.message?.content
   if (!raw) throw new Error('Empty response from NIM')

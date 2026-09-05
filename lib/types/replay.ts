@@ -166,6 +166,8 @@ export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   createdAt: string
+  /** True when the coach pushed this message unprompted (proactive suggestion) */
+  proactive?: boolean
 }
 
 // ── Equity curve ──────────────────────────────────────────────────────────────

@@ -1,7 +1,15 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { getNimClient, NIM_MODEL, NIM_FALLBACK_MODEL } from '@/lib/nim/client'
+import {
+  getNimClient,
+  NIM_MODEL_FAST,
+  NIM_NO_THINKING,
+  NIM_FALLBACK_MODEL,
+  NIM_REQUEST_TIMEOUT_MS,
+} from '@/lib/nim/client'
+import type { Stream } from 'openai/streaming'
+import type { ChatCompletionChunk } from 'openai/resources/chat/completions'
 import { REPLAY_COACH_SYSTEM_PROMPT } from '@/lib/prompts/replay-coach-prompts'
 import { buildReplayContext, type ReplayContextSnapshot } from '@/lib/nim/build-replay-context'
 
@@ -91,31 +99,67 @@ export async function POST(
     // the live chart state; history stays plain conversation.
     const userContent = `${message}\n\n${buildReplayContext(snapshot as ReplayContextSnapshot)}`
 
-    let reply: string | null = null
-    for (const model of [NIM_MODEL, NIM_FALLBACK_MODEL]) {
+    const messages = [
+      { role: 'system' as const, content: REPLAY_COACH_SYSTEM_PROMPT },
+      ...history,
+      { role: 'user' as const, content: userContent },
+    ]
+
+    // Fast non-reasoning model first, thinking disabled; stream tokens through
+    // to the client as SSE so the coach feels responsive. On primary failure
+    // (timeout included) fall back to the non-reasoning nano.
+    let upstream: Stream<ChatCompletionChunk> | null = null
+    for (const model of [NIM_MODEL_FAST, NIM_FALLBACK_MODEL]) {
       try {
-        const completion = await getNimClient().chat.completions.create({
-          model,
-          messages: [
-            { role: 'system', content: REPLAY_COACH_SYSTEM_PROMPT },
-            ...history,
-            { role: 'user', content: userContent },
-          ],
-          max_tokens: 1024,
-          temperature: 0.5,
-        })
-        reply = completion.choices[0]?.message?.content?.trim() ?? null
-        if (reply) break
+        upstream = await getNimClient().chat.completions.create(
+          {
+            model,
+            messages,
+            max_tokens: 1024,
+            temperature: 0.5,
+            stream: true,
+            ...NIM_NO_THINKING,
+          },
+          { timeout: NIM_REQUEST_TIMEOUT_MS },
+        )
+        break
       } catch (err) {
         console.error(`[api/replay/chat] ${model} failed:`, err)
       }
     }
 
-    if (!reply) {
+    if (!upstream) {
       return NextResponse.json({ error: 'AI coach unavailable. Try again.' }, { status: 502 })
     }
 
-    return NextResponse.json({ reply })
+    // Bridge the OpenAI SDK stream into our own SSE: {delta} frames + [DONE]
+    const encoder = new TextEncoder()
+    const sse = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        try {
+          for await (const chunk of upstream!) {
+            const delta = chunk.choices[0]?.delta?.content
+            if (delta) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta })}\n\n`))
+            }
+          }
+          controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+        } catch (err) {
+          console.error('[api/replay/chat] stream failed:', err)
+          // Client sees a short answer; nothing else to do mid-stream
+        } finally {
+          controller.close()
+        }
+      },
+    })
+
+    return new Response(sse, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+      },
+    })
   } catch (error) {
     console.error('[api/replay/chat]', error)
     return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 })

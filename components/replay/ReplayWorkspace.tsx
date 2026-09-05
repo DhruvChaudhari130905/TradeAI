@@ -17,7 +17,8 @@ import { TradingPanel } from './TradingPanel'
 import { PositionsPanel } from './PositionsPanel'
 import { DrawToolbar } from './DrawToolbar'
 import { IndicatorMenu } from './IndicatorMenu'
-import { AiChatPanel, AiChatPanelHeader } from './AiChatPanel'
+import { AiChatPanel } from './AiChatPanel'
+import { useProactiveCoach } from './use-proactive-coach'
 import type { DrawTool } from './DrawingOverlay'
 import type { SlTpPatch } from './SlTpOverlay'
 import { useOrderSizing } from './use-order-sizing'
@@ -206,6 +207,26 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
 
   const freeMargin = session.equity - session.marginUsed
 
+  // Proactive AI coach — watches for closed trades / risk stress and pushes
+  // unprompted suggestions into the chat panel (rate limited, toggleable).
+  const { autoCoach, setAutoCoach } = useProactiveCoach({
+    config,
+    activeTf: session.state.activeTf,
+    cursorIndex: session.state.cursorIndex,
+    visibleCandles: session.visibleCandles,
+    positions: session.state.positions,
+    orders: session.state.orders,
+    balance: session.state.balance,
+    equity: session.equity,
+    marginUsed: session.marginUsed,
+    freeMargin,
+    indicatorConfigs: session.state.indicatorConfigs,
+    drawings: session.state.drawings,
+    closedTrades: session.state.closedTrades,
+    chatMessages: session.state.chatMessages,
+    appendChatMessages: session.appendChatMessages,
+  })
+
   async function handleEndSession() {
     setEnding(true)
     const saved = await session.flushSave()
@@ -236,6 +257,8 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
       closedTrades={session.state.closedTrades}
       chatMessages={session.state.chatMessages}
       appendChatMessages={session.appendChatMessages}
+      autoCoach={autoCoach}
+      onToggleAutoCoach={() => setAutoCoach(!autoCoach)}
     />
   )
 
@@ -264,6 +287,7 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
         currentPrice={currentPrice}
         positions={session.state.positions}
         orders={session.state.orders}
+        closedTrades={session.state.closedTrades}
         onClosePosition={session.closePositionFull}
         onPartialClose={session.partialClosePosition}
         onModifyPosition={session.modifyPositionFields}
@@ -435,21 +459,21 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
           </Sheet>
         </div>
 
-        {/* Desktop right rail */}
+        {/* Desktop right rail: AI Coach on top, Order Entry in the middle,
+            Positions & Orders (with closed trades) at the end — equal thirds */}
         <aside className="hidden min-h-0 flex-col gap-3 lg:flex">
-          <div className="rounded-lg border border-[#27272A] bg-[#12141A] p-4">
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">Order Entry</h3>
-            {tradingSection}
+          <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-[#27272A] bg-[#12141A] p-4">
+            {chatSection}
+          </div>
+          <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-[#27272A] bg-[#12141A] p-4">
+            <h3 className="mb-3 shrink-0 text-xs font-semibold uppercase tracking-wider text-zinc-500">Order Entry</h3>
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1">{tradingSection}</div>
           </div>
           <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-[#27272A] bg-[#12141A] p-4">
             <h3 className="mb-3 shrink-0 text-xs font-semibold uppercase tracking-wider text-zinc-500">
               Positions &amp; Orders
             </h3>
             <ScrollArea className="min-h-0 flex-1 pr-1">{renderPositions()}</ScrollArea>
-          </div>
-          <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-[#27272A] bg-[#12141A] p-4">
-            <AiChatPanelHeader />
-            <div className="mt-2 flex min-h-0 flex-1 flex-col">{chatSection}</div>
           </div>
         </aside>
       </div>

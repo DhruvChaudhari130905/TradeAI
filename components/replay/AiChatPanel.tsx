@@ -4,80 +4,36 @@
 // model always sees the current chart state; history persisted by autosave.
 
 import { useRef, useState } from 'react'
-import { Loader2, SendHorizonal, Sparkles } from 'lucide-react'
+import { SendHorizonal, Sparkles, Zap } from 'lucide-react'
 import { toast } from 'sonner'
-import { priceDigits } from '@/lib/replay/execution'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Textarea } from '@/components/ui/textarea'
-import type {
-  Candle,
-  ChatMessage,
-  ClosedReplayTrade,
-  DrawingShape,
-  PendingOrder,
-  ReplayIndicatorConfig,
-  ReplayPosition,
-  Timeframe,
-} from '@/lib/types/replay'
+import type { ChatMessage } from '@/lib/types/replay'
 import type { ReplaySessionConfig } from './use-replay-session'
-import { computeIndicators, type IndicatorSeries } from '@/lib/replay/indicators'
-import { buildReplayContext, type ReplayContextSnapshot } from '@/lib/nim/build-replay-context'
+import { buildReplaySnapshot } from './build-replay-snapshot'
+import type { ReplayContextSnapshot } from '@/lib/nim/build-replay-context'
 
 interface AiChatPanelProps {
   config: ReplaySessionConfig
-  activeTf: Timeframe
-  visibleCandles: Candle[]
-  positions: ReplayPosition[]
-  orders: PendingOrder[]
-  balance: number
-  equity: number
-  marginUsed: number
-  freeMargin: number
-  indicatorConfigs: ReplayIndicatorConfig[]
-  drawings: DrawingShape[]
-  closedTrades: ClosedReplayTrade[]
+  activeTf: AiChatPanelSnapshotArgs['activeTf']
+  visibleCandles: AiChatPanelSnapshotArgs['visibleCandles']
+  positions: AiChatPanelSnapshotArgs['positions']
+  orders: AiChatPanelSnapshotArgs['orders']
+  balance: AiChatPanelSnapshotArgs['balance']
+  equity: AiChatPanelSnapshotArgs['equity']
+  marginUsed: AiChatPanelSnapshotArgs['marginUsed']
+  freeMargin: AiChatPanelSnapshotArgs['freeMargin']
+  indicatorConfigs: AiChatPanelSnapshotArgs['indicatorConfigs']
+  drawings: AiChatPanelSnapshotArgs['drawings']
+  closedTrades: AiChatPanelSnapshotArgs['closedTrades']
   chatMessages: ChatMessage[]
   appendChatMessages: (messages: ChatMessage[]) => void
+  autoCoach?: boolean
+  onToggleAutoCoach?: () => void
 }
 
-/** Current value of one configured indicator, or null when not computable */
-function currentValue(
-  cfg: ReplayIndicatorConfig,
-  results: Map<string, number[] | IndicatorSeries>,
-): number | null {
-  let series: number[] | undefined
-  if (cfg.type === 'EMA' || cfg.type === 'SMA') {
-    series = results.get(`${cfg.type.toLowerCase()}_${cfg.params.period ?? (cfg.type === 'EMA' ? 9 : 20)}`) as number[] | undefined
-  } else if (cfg.type === 'RSI') {
-    series = results.get(`rsi_${cfg.params.period ?? 14}`) as number[] | undefined
-  } else if (cfg.type === 'MACD') {
-    series = (results.get('macd') as IndicatorSeries | undefined)?.macd
-  } else if (cfg.type === 'BBANDS') {
-    series = (results.get('bbands') as IndicatorSeries | undefined)?.middle
-  }
-  if (!series || series.length === 0) return null
-  const last = series[series.length - 1]
-  return Number.isFinite(last) ? last : null
-}
-
-function drawingSummary(d: DrawingShape, digits: number): string {
-  const p = (n: number) => n.toFixed(digits)
-  switch (d.kind) {
-    case 'hline':
-      return `hline ${p(d.points[0].price)}`
-    case 'vline':
-      return `vline ${d.points[0].time.slice(0, 16)}`
-    case 'trendline':
-      return `trendline ${p(d.points[0].price)} to ${p(d.points[1].price)}`
-    case 'rect':
-      return `zone ${p(Math.min(d.points[0].price, d.points[1].price))}-${p(Math.max(d.points[0].price, d.points[1].price))}`
-    case 'fib':
-      return `fib ${p(Math.max(d.points[0].price, d.points[1].price))} to ${p(Math.min(d.points[0].price, d.points[1].price))}`
-    default:
-      return d.label ?? d.kind
-  }
-}
+type AiChatPanelSnapshotArgs = Parameters<typeof buildReplaySnapshot>[0]
 
 export function AiChatPanel({
   config,
@@ -94,46 +50,29 @@ export function AiChatPanel({
   closedTrades,
   chatMessages,
   appendChatMessages,
+  autoCoach,
+  onToggleAutoCoach,
 }: AiChatPanelProps) {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  const [streamingText, setStreamingText] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   function buildSnapshot(): ReplayContextSnapshot {
-    const digits = priceDigits(config.pair, config.market)
-    const visibleConfigs = indicatorConfigs.filter((c) => c.visible)
-    const results =
-      visibleConfigs.length > 0
-        ? computeIndicators(
-            visibleCandles,
-            visibleConfigs.map((c) => ({ type: c.type, params: c.params })),
-          )
-        : new Map()
-
-    return {
-      pair: config.pair,
-      market: config.market,
-      activeTimeframe: activeTf,
-      currentTime: visibleCandles[visibleCandles.length - 1]?.time ?? '',
+    return buildReplaySnapshot({
+      config,
+      activeTf,
+      visibleCandles,
+      positions,
+      orders,
       balance,
       equity,
       marginUsed,
       freeMargin,
-      leverage: config.leverage,
-      spreadPips: config.spreadPips,
-      recentCandles: visibleCandles.slice(-60),
-      indicators: visibleConfigs.map((c) => ({ label: `${c.type}`, value: currentValue(c, results) })),
-      positions,
-      pendingOrders: orders,
-      closedTradeCount: closedTrades.length,
-      recentClosedTrades: closedTrades.slice(-5).map((t) => ({
-        direction: t.direction,
-        pnlUsd: t.pnlUsd,
-        pnlPips: t.pnlPips,
-        exitReason: t.exitReason,
-      })),
-      drawingsSummary: drawings.map((d) => drawingSummary(d, digits)),
-    }
+      indicatorConfigs,
+      drawings,
+      closedTrades,
+    })
   }
 
   async function send() {
@@ -142,6 +81,8 @@ export function AiChatPanel({
 
     setInput('')
     setSending(true)
+    // Echo the user's message immediately; the assistant reply streams in below
+    appendChatMessages([{ role: 'user', content: message, createdAt: new Date().toISOString() }])
     try {
       const res = await fetch(`/api/replay/${config.id}/chat`, {
         method: 'POST',
@@ -152,16 +93,52 @@ export function AiChatPanel({
           snapshot: buildSnapshot(),
         }),
       })
-      const body = await res.json().catch(() => null)
-      if (!res.ok) {
+      if (!res.ok || !res.body) {
+        const body = await res.json().catch(() => null)
         toast.error(body?.error ?? 'AI coach unavailable.')
         return
       }
-      appendChatMessages([
-        { role: 'user', content: message, createdAt: new Date().toISOString() },
-        { role: 'assistant', content: body.reply, createdAt: new Date().toISOString() },
-      ])
-      requestAnimationFrame(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }))
+
+      // Stream SSE deltas into a live bubble; commit once complete so autosave
+      // only ever persists the finished message.
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let acc = ''
+      let buffer = ''
+      setStreamingText('')
+      try {
+        for (;;) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          let idx: number
+          while ((idx = buffer.indexOf('\n\n')) !== -1) {
+            const frame = buffer.slice(0, idx)
+            buffer = buffer.slice(idx + 2)
+            if (!frame.startsWith('data: ')) continue
+            const payload = frame.slice(6)
+            if (payload === '[DONE]') continue
+            try {
+              acc += (JSON.parse(payload) as { delta?: string }).delta ?? ''
+              setStreamingText(acc)
+            } catch {
+              // Malformed frame — skip it
+            }
+          }
+        }
+      } finally {
+        setStreamingText(null)
+        reader.releaseLock()
+      }
+
+      if (acc.trim()) {
+        appendChatMessages([
+          { role: 'assistant', content: acc.trim(), createdAt: new Date().toISOString() },
+        ])
+        requestAnimationFrame(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }))
+      } else {
+        toast.error('AI coach unavailable. Try again.')
+      }
     } catch {
       toast.error('Could not reach the AI coach.')
     } finally {
@@ -171,11 +148,16 @@ export function AiChatPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <ScrollArea className="min-h-0 flex-1 pr-1">
+      <AiChatPanelHeader
+        autoCoach={autoCoach}
+        onToggleAutoCoach={onToggleAutoCoach}
+        active={sending || streamingText !== null}
+      />
+      <ScrollArea className="mt-2 min-h-0 flex-1 pr-1">
         <div ref={scrollRef} className="space-y-3">
           {chatMessages.length === 0 && (
             <p className="py-4 text-center text-xs text-zinc-600">
-              Ask about your setup, risk, or what you see on the chart.
+              Ask about your setup, risk, or what you see on the chart — the coach also chimes in on its own after notable moments.
             </p>
           )}
           {chatMessages.map((m, i) => (
@@ -187,13 +169,31 @@ export function AiChatPanel({
                     : 'bg-[#1C1E26] text-zinc-300'
                 }`}
               >
+                {m.proactive && (
+                  <span className="mb-1 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[#00FF9C]/70">
+                    <Zap className="h-3 w-3" /> Coach suggestion
+                  </span>
+                )}
                 {m.content}
               </div>
             </div>
           ))}
-          {sending && (
-            <div className="flex items-center gap-2 text-xs text-zinc-500">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Coach is thinking…
+          {sending && streamingText === null && (
+            <div className="flex items-center gap-1.5 px-1 py-2" role="status" aria-label="Coach is thinking">
+              <span className="coach-dot inline-block h-1.5 w-1.5 rounded-full bg-[#00FF9C]" />
+              <span className="coach-dot inline-block h-1.5 w-1.5 rounded-full bg-[#00FF9C]" style={{ animationDelay: '0.15s' }} />
+              <span className="coach-dot inline-block h-1.5 w-1.5 rounded-full bg-[#00FF9C]" style={{ animationDelay: '0.3s' }} />
+              <span className="ml-1 text-xs text-zinc-500">Coach is thinking…</span>
+            </div>
+          )}
+          {streamingText !== null && (
+            <div className="flex justify-start">
+              <div className="coach-glow max-w-[90%] whitespace-pre-wrap rounded-lg bg-[#1C1E26] px-3 py-2 text-xs leading-relaxed">
+                <span className={streamingText ? 'coach-shimmer' : 'text-zinc-300'}>
+                  {streamingText || '…'}
+                </span>
+                <span className="ml-0.5 inline-block h-3 w-1.5 animate-pulse bg-[#00FF9C]/70 align-middle" />
+              </div>
             </div>
           )}
         </div>
@@ -222,11 +222,39 @@ export function AiChatPanel({
   )
 }
 
-export function AiChatPanelHeader() {
+export function AiChatPanelHeader({
+  autoCoach,
+  onToggleAutoCoach,
+  active = false,
+}: {
+  autoCoach?: boolean
+  onToggleAutoCoach?: () => void
+  /** True while the coach is thinking or streaming — pulses the sparkle */
+  active?: boolean
+}) {
   return (
     <div className="flex shrink-0 items-center gap-1.5">
-      <Sparkles className="h-3.5 w-3.5 text-[#00FF9C]" />
+      <Sparkles
+        className={`h-3.5 w-3.5 text-[#00FF9C] ${active ? 'animate-pulse' : ''}`}
+      />
       <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">AI Coach</h3>
+      {onToggleAutoCoach && (
+        <button
+          type="button"
+          role="switch"
+          aria-checked={autoCoach}
+          aria-label="Auto-coach: proactive suggestions"
+          onClick={onToggleAutoCoach}
+          className={`ml-auto flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] transition-colors ${
+            autoCoach
+              ? 'border-[#00FF9C]/40 bg-[#00FF9C]/10 text-[#00FF9C]'
+              : 'border-[#27272A] text-zinc-500 hover:text-zinc-300'
+          }`}
+        >
+          <Zap className="h-3 w-3" />
+          Auto-coach {autoCoach ? 'on' : 'off'}
+        </button>
+      )}
     </div>
   )
 }

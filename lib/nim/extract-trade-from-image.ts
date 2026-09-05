@@ -1,7 +1,8 @@
 import {
   getNimClient,
-  NIM_MODEL,
+  NIM_MODEL_OMNI,
   NIM_FALLBACK_MODEL,
+  NIM_DEFAULT_TIMEOUT_MS,
 } from '@/lib/nim/client'
 import { parseNimJson } from '@/lib/nim/parse-nim-json'
 import {
@@ -48,7 +49,9 @@ Rules:
   "low" means you inferred or are unsure.
 - Prefer the floating position/order line (entry, stop loss, take profit) over the price axis.`
 
-async function base64FromUrl(url: string): Promise<string> {
+/** Server-only helper: download an image and return it base64-encoded.
+ *  Shared by the screenshot extractor and the trade reviewers. */
+export async function base64FromUrl(url: string): Promise<string> {
   const res = await fetch(url)
   if (!res.ok) throw new Error(`Failed to fetch screenshot (${res.status})`)
   const buf = Buffer.from(await res.arrayBuffer())
@@ -59,23 +62,26 @@ async function callExtractor(imageUrl: string): Promise<RawTradeExtraction | nul
   const b64 = await base64FromUrl(imageUrl)
   const dataUrl = `data:image/jpeg;base64,${b64}`
 
-  for (const model of [NIM_MODEL, NIM_FALLBACK_MODEL]) {
+  for (const model of [NIM_MODEL_OMNI, NIM_FALLBACK_MODEL]) {
     try {
-      const completion = await getNimClient().chat.completions.create({
-        model,
-        messages: [
-          { role: 'system', content: EXTRACT_PROMPT },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: 'Extract the trade data from this chart screenshot into the requested JSON.' },
-              { type: 'image_url', image_url: { url: dataUrl } },
-            ],
-          },
-        ],
-        max_tokens: 1024,
-        temperature: 0.1,
-      })
+      const completion = await getNimClient().chat.completions.create(
+        {
+          model,
+          messages: [
+            { role: 'system', content: EXTRACT_PROMPT },
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: 'Extract the trade data from this chart screenshot into the requested JSON.' },
+                { type: 'image_url', image_url: { url: dataUrl } },
+              ] as never,
+            },
+          ],
+          max_tokens: 1024,
+          temperature: 0.1,
+        },
+        { timeout: NIM_DEFAULT_TIMEOUT_MS },
+      )
 
       const raw = completion.choices[0]?.message?.content
       if (!raw) continue

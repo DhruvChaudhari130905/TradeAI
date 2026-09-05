@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import type { PendingOrder, ReplayPosition } from '@/lib/types/replay'
+import type { ClosedReplayTrade, PendingOrder, ReplayPosition } from '@/lib/types/replay'
 import { floatingPnl, pipSize, priceDigits } from '@/lib/replay/execution'
 
 interface PositionsPanelProps {
@@ -20,6 +20,7 @@ interface PositionsPanelProps {
   currentPrice: number | null
   positions: ReplayPosition[]
   orders: PendingOrder[]
+  closedTrades: ClosedReplayTrade[]
   onClosePosition: (id: string) => void
   onPartialClose: (id: string, lots: number) => void
   onModifyPosition: (id: string, patch: Partial<Pick<ReplayPosition, 'stopLoss' | 'takeProfit' | 'trailingStopPips' | 'breakEvenMoved'>>) => void
@@ -28,54 +29,98 @@ interface PositionsPanelProps {
   largeTargets?: boolean
 }
 
+/** Max rows of open positions/orders visible before the list scrolls (~4 rows) */
+const OPEN_LIST_MAX_HEIGHT_CLASS = 'max-h-[15rem]'
+
 export function PositionsPanel({
   pair,
   market,
   currentPrice,
   positions,
   orders,
+  closedTrades,
   onClosePosition,
   onPartialClose,
   onModifyPosition,
   onCancelOrder,
   largeTargets = false,
 }: PositionsPanelProps) {
-  if (positions.length === 0 && orders.length === 0) {
+  if (positions.length === 0 && orders.length === 0 && closedTrades.length === 0) {
     return <p className="py-4 text-center text-xs text-zinc-600">No open positions or orders</p>
   }
 
+  const closedNewestFirst = closedTrades.slice(-20).reverse()
+
   return (
     <div className="space-y-2">
-      {positions.map((p) => (
-        <PositionRow
-          key={p.id}
-          position={p}
-          pair={pair}
-          market={market}
-          currentPrice={currentPrice}
-          onClose={onClosePosition}
-          onPartialClose={onPartialClose}
-          onModify={onModifyPosition}
-          largeTargets={largeTargets}
-        />
-      ))}
-      {orders.map((o) => (
-        <div key={o.id} className="flex items-center gap-2 rounded-md border border-[#27272A] bg-[#1C1E26] px-3 py-2">
-          <Badge variant="secondary" className="text-[10px] uppercase">{o.type}</Badge>
-          <span className={`font-mono text-xs ${o.side === 'buy' ? 'text-[#00FF9C]' : 'text-[#FF4D4D]'}`}>
-            {o.side.toUpperCase()} {o.lotSize} @ {o.price}
-          </span>
-          <button
-            onClick={() => onCancelOrder(o.id)}
-            aria-label={`Cancel ${o.side} ${o.type} order at ${o.price}`}
-            className={`ml-auto flex items-center justify-center rounded text-zinc-500 hover:bg-[#FF4D4D]/10 hover:text-[#FF4D4D] ${
-              largeTargets ? 'h-11 w-11' : 'h-7 w-7'
-            }`}
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
+      {/* Open positions + pending orders — capped at ~4 rows, rest scrolls */}
+      {(positions.length > 0 || orders.length > 0) && (
+        <div className={`space-y-2 overflow-y-auto pr-1 ${OPEN_LIST_MAX_HEIGHT_CLASS}`}>
+          {positions.map((p) => (
+            <PositionRow
+              key={p.id}
+              position={p}
+              pair={pair}
+              market={market}
+              currentPrice={currentPrice}
+              onClose={onClosePosition}
+              onPartialClose={onPartialClose}
+              onModify={onModifyPosition}
+              largeTargets={largeTargets}
+            />
+          ))}
+          {orders.map((o) => (
+            <div key={o.id} className="flex items-center gap-2 rounded-md border border-[#27272A] bg-[#1C1E26] px-3 py-2">
+              <Badge variant="secondary" className="text-[10px] uppercase">{o.type}</Badge>
+              <span className={`font-mono text-xs ${o.side === 'buy' ? 'text-[#00FF9C]' : 'text-[#FF4D4D]'}`}>
+                {o.side.toUpperCase()} {o.lotSize} @ {o.price}
+              </span>
+              <button
+                onClick={() => onCancelOrder(o.id)}
+                aria-label={`Cancel ${o.side} ${o.type} order at ${o.price}`}
+                className={`ml-auto flex items-center justify-center rounded text-zinc-500 hover:bg-[#FF4D4D]/10 hover:text-[#FF4D4D] ${
+                  largeTargets ? 'h-11 w-11' : 'h-7 w-7'
+                }`}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
+
+      {/* Closed trades this session — newest first, last 20 */}
+      {closedNewestFirst.length > 0 && (
+        <div>
+          <h4 className="sticky top-0 bg-[#12141A] py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
+            Closed Trades ({closedTrades.length})
+          </h4>
+          <div className="max-h-[15rem] space-y-1 overflow-y-auto pr-1">
+            {closedNewestFirst.map((t) => (
+              <div
+                key={t.id}
+                className="flex items-center gap-2 rounded-md border border-[#27272A] bg-[#161820] px-3 py-1.5 text-[11px]"
+              >
+                <span className={`font-mono font-semibold ${t.direction === 'long' ? 'text-[#00FF9C]' : 'text-[#FF4D4D]'}`}>
+                  {t.direction.toUpperCase()}
+                </span>
+                <span className="font-mono text-zinc-400">
+                  {t.entryPrice.toFixed(priceDigits(pair, market))} → {t.exitPrice.toFixed(priceDigits(pair, market))}
+                </span>
+                <span
+                  className={`ml-auto font-mono font-semibold ${
+                    t.pnlUsd > 0 ? 'text-[#00FF9C]' : t.pnlUsd < 0 ? 'text-[#FF4D4D]' : 'text-zinc-400'
+                  }`}
+                >
+                  {t.pnlUsd >= 0 ? '+' : ''}${t.pnlUsd.toFixed(2)}
+                </span>
+                <span className="font-mono text-zinc-500">{t.pnlPips.toFixed(1)}p</span>
+                <span className="text-[10px] text-zinc-600">{t.exitReason.replace(/_/g, ' ')}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getNimClient, NIM_MODEL, NIM_FALLBACK_MODEL } from '@/lib/nim/client'
+import { getNimClient, NIM_MODEL_FAST, NIM_NO_THINKING, NIM_FALLBACK_MODEL, NIM_REQUEST_TIMEOUT_MS } from '@/lib/nim/client'
 import { parseNimJson } from '@/lib/nim/parse-nim-json'
 import { INSIGHTS_SYSTEM_PROMPT } from '@/lib/prompts/insights-system-prompt'
 
@@ -78,14 +78,15 @@ export async function POST(request: Request) {
 
     try {
       const response = await nim.chat.completions.create({
-        model: NIM_MODEL,
+        model: NIM_MODEL_FAST,
         messages: [
           { role: 'system', content: INSIGHTS_SYSTEM_PROMPT },
           { role: 'user', content: `Here are my recent trades:\n${tradeContext}` },
         ],
         temperature: 0.4,
         max_tokens: 2048,
-      })
+        ...NIM_NO_THINKING,
+      }, { timeout: NIM_REQUEST_TIMEOUT_MS })
 
       const content = response.choices[0]?.message?.content?.trim() ?? '[]'
       insights = parseNimJson<unknown[]>(content)
@@ -100,7 +101,7 @@ export async function POST(request: Request) {
           ],
           temperature: 0.4,
           max_tokens: 2048,
-        })
+        }, { timeout: NIM_REQUEST_TIMEOUT_MS })
 
         const content = response.choices[0]?.message?.content?.trim() ?? '[]'
         insights = parseNimJson<unknown[]>(content)

@@ -8,7 +8,7 @@ import {
   REPLAY_RISK_MANAGER_PROMPT,
   REPLAY_TRADING_PSYCHOLOGIST_PROMPT,
 } from '@/lib/prompts/replay-review-prompts'
-import { getNimClient, NIM_MODEL, NIM_FALLBACK_MODEL } from './client'
+import { getNimClient, NIM_MODEL_VISION, NIM_FALLBACK_MODEL } from './client'
 import { parseNimJson } from './parse-nim-json'
 
 // Runs the 5-personality AI review of a completed replay session.
@@ -76,7 +76,7 @@ function isValidReview(review: unknown): review is ReplayPersonalityReview {
 }
 
 async function callReviewer(prompt: string, context: string): Promise<ReplayPersonalityReview | null> {
-  for (const model of [NIM_MODEL, NIM_FALLBACK_MODEL]) {
+  for (const model of [NIM_MODEL_VISION, NIM_FALLBACK_MODEL]) {
     try {
       const completion = await getNimClient().chat.completions.create({
         model,
@@ -104,7 +104,8 @@ async function callReviewer(prompt: string, context: string): Promise<ReplayPers
   return null
 }
 
-/** Run all 5 reviewers sequentially with a small delay (NIM rate limits); partial failures yield null slots */
+/** Run all 5 reviewers in parallel (NIM free tier comfortably serves 5
+ *  concurrent calls); partial failures yield null slots */
 export async function runReplayReviews(context: string): Promise<PersonalityReviewSet> {
   const set: PersonalityReviewSet = {
     prop_firm_evaluator: null,
@@ -115,10 +116,11 @@ export async function runReplayReviews(context: string): Promise<PersonalityRevi
     composite_score: null,
   }
 
-  for (const reviewer of REVIEWERS) {
-    set[reviewer.key] = await callReviewer(reviewer.prompt, context)
-    await new Promise((resolve) => setTimeout(resolve, 500))
-  }
+  await Promise.all(
+    REVIEWERS.map(async (reviewer) => {
+      set[reviewer.key] = await callReviewer(reviewer.prompt, context)
+    }),
+  )
 
   const scores = REVIEWERS.map((r) => set[r.key]).filter((r): r is ReplayPersonalityReview => r !== null)
   if (scores.length > 0) {
