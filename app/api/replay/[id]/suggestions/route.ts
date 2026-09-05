@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { getNimClient, NIM_MODEL_FAST, NIM_NO_THINKING, NIM_FALLBACK_MODEL, NIM_REQUEST_TIMEOUT_MS } from '@/lib/nim/client'
+import { getNimClient, NIM_MODEL_FAST, NIM_NO_THINKING, NIM_FALLBACK_MODEL, NIM_REQUEST_TIMEOUT_MS, withRateLimitRetry } from '@/lib/nim/client'
 import { REPLAY_PROACTIVE_SYSTEM_PROMPT } from '@/lib/prompts/replay-proactive-prompts'
 import { buildReplayContext, type ReplayContextSnapshot } from '@/lib/nim/build-replay-context'
 
@@ -95,17 +95,22 @@ export async function POST(
     let reply: string | null = null
     for (const model of [NIM_MODEL_FAST, NIM_FALLBACK_MODEL]) {
       try {
-        const completion = await getNimClient().chat.completions.create({
-          model,
-          messages: [
-            { role: 'system', content: REPLAY_PROACTIVE_SYSTEM_PROMPT },
-            ...history,
-            { role: 'user', content: userContent },
-          ],
-          max_tokens: 512,
-          temperature: 0.5,
-          ...NIM_NO_THINKING,
-        }, { timeout: NIM_REQUEST_TIMEOUT_MS })
+        const completion = await withRateLimitRetry(() =>
+          getNimClient().chat.completions.create(
+            {
+              model,
+              messages: [
+                { role: 'system', content: REPLAY_PROACTIVE_SYSTEM_PROMPT },
+                ...history,
+                { role: 'user', content: userContent },
+              ],
+              max_tokens: 512,
+              temperature: 0.5,
+              ...NIM_NO_THINKING,
+            },
+            { timeout: NIM_REQUEST_TIMEOUT_MS },
+          ),
+        )
         reply = completion.choices[0]?.message?.content?.trim() ?? null
         if (reply) break
       } catch (err) {

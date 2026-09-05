@@ -8,7 +8,7 @@ import {
   REPLAY_RISK_MANAGER_PROMPT,
   REPLAY_TRADING_PSYCHOLOGIST_PROMPT,
 } from '@/lib/prompts/replay-review-prompts'
-import { getNimClient, NIM_MODEL_VISION, NIM_FALLBACK_MODEL } from './client'
+import { getNimClient, NIM_MODEL_VISION, NIM_FALLBACK_MODEL, withRateLimitRetry, mapWithConcurrency } from './client'
 import { parseNimJson } from './parse-nim-json'
 
 // Runs the 5-personality AI review of a completed replay session.
@@ -78,15 +78,17 @@ function isValidReview(review: unknown): review is ReplayPersonalityReview {
 async function callReviewer(prompt: string, context: string): Promise<ReplayPersonalityReview | null> {
   for (const model of [NIM_MODEL_VISION, NIM_FALLBACK_MODEL]) {
     try {
-      const completion = await getNimClient().chat.completions.create({
-        model,
-        messages: [
-          { role: 'system', content: prompt },
-          { role: 'user', content: context },
-        ],
-        max_tokens: 2048,
-        temperature: 0.3,
-      })
+      const completion = await withRateLimitRetry(() =>
+        getNimClient().chat.completions.create({
+          model,
+          messages: [
+            { role: 'system', content: prompt },
+            { role: 'user', content: context },
+          ],
+          max_tokens: 2048,
+          temperature: 0.3,
+        }),
+      )
       const raw = completion.choices[0]?.message?.content
       if (!raw) continue
       const parsed = parseNimJson<ReplayPersonalityReview>(raw)
@@ -104,8 +106,8 @@ async function callReviewer(prompt: string, context: string): Promise<ReplayPers
   return null
 }
 
-/** Run all 5 reviewers in parallel (NIM free tier comfortably serves 5
- *  concurrent calls); partial failures yield null slots */
+/** Run all 5 reviewers with limited concurrency (2 at a time — NIM free tier
+ *  rate-limits on wider bursts) plus 429 backoff; partial failures yield null slots */
 export async function runReplayReviews(context: string): Promise<PersonalityReviewSet> {
   const set: PersonalityReviewSet = {
     prop_firm_evaluator: null,
@@ -116,11 +118,9 @@ export async function runReplayReviews(context: string): Promise<PersonalityRevi
     composite_score: null,
   }
 
-  await Promise.all(
-    REVIEWERS.map(async (reviewer) => {
-      set[reviewer.key] = await callReviewer(reviewer.prompt, context)
-    }),
-  )
+  await mapWithConcurrency(REVIEWERS, 2, async (reviewer) => {
+    set[reviewer.key] = await callReviewer(reviewer.prompt, context)
+  })
 
   const scores = REVIEWERS.map((r) => set[r.key]).filter((r): r is ReplayPersonalityReview => r !== null)
   if (scores.length > 0) {

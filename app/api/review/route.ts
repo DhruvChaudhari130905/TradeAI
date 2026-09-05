@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service-client'
-import { getNimClient, NIM_MODEL_VISION, NIM_REQUEST_TIMEOUT_MS } from '@/lib/nim/client'
+import { getNimClient, NIM_MODEL_VISION, NIM_REQUEST_TIMEOUT_MS, withRateLimitRetry, mapWithConcurrency } from '@/lib/nim/client'
 import { parseNimJson } from '@/lib/nim/parse-nim-json'
 import { base64FromUrl } from '@/lib/nim/extract-trade-from-image'
 import { buildTradeContext } from '@/lib/nim/build-trade-context'
@@ -72,27 +72,22 @@ export async function POST(request: Request) {
       { key: 'risk_manager', prompt: RISK_MANAGER_PROMPT },
     ] as const
 
-    // Call all 5 personalities in parallel (with one retry on failure)
-    const results = await Promise.all(
-      personalities.map(async ({ key, prompt }, index) => {
-        // Stagger requests slightly to avoid rate limits
-        if (index > 0) {
-          await new Promise((resolve) => setTimeout(resolve, index * 200))
-        }
-        const systemPrompt = buildReviewSystemPrompt(prompt)
+    // Call all 5 personalities (2 at a time) with one fallback-model retry.
+    // NIM free tier 429s on wider bursts, so each call also backs off on 429.
+    const results = await mapWithConcurrency([...personalities], 2, async ({ key, prompt }) => {
+      const systemPrompt = buildReviewSystemPrompt(prompt)
+      try {
+        return { key, review: await withRateLimitRetry(() => callNim(systemPrompt, tradeContext, trade.screenshot_urls)) }
+      } catch {
+        // Retry once with fallback model (text-only — drop screenshots)
         try {
-          return { key, review: await callNim(systemPrompt, tradeContext, trade.screenshot_urls) }
-        } catch {
-          // Retry once with fallback model (text-only — drop screenshots)
-          try {
-            return { key, review: await callNim(systemPrompt, tradeContext, null) }
-          } catch (error) {
-            console.error(`[api/review] ${key} failed after retry:`, error)
-            return { key, review: null }
-          }
+          return { key, review: await callNim(systemPrompt, tradeContext, null) }
+        } catch (error) {
+          console.error(`[api/review] ${key} failed after retry:`, error)
+          return { key, review: null }
         }
-      }),
-    )
+      }
+    })
 
     // Build review object
     const reviewData: Record<string, PersonalityReview | null> = {}
