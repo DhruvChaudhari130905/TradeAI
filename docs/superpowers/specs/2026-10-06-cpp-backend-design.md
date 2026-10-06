@@ -39,7 +39,7 @@ Each sub-project gets its own spec → plan → implementation cycle. **This spe
 ```
 Trade-AI/
 ├── app/, lib/, components/        # Next.js — shrinks as endpoints move
-├── lib/api/cpp-client.ts          # apiFetch<T>() — attaches Bearer token, returns ApiResult<T>
+├── lib/api/{core,client,server}.ts # apiFetch / apiFetchServer — attach Bearer token, return ApiResult<T>
 └── backend/
     ├── CMakeLists.txt, CMakePresets.json, vcpkg.json
     ├── Dockerfile, fly.toml, docker-compose.yml, .env.example
@@ -132,7 +132,7 @@ Missing required var → log the var name, exit code 1. Returns `std::expected<C
 
 ### 3.6 Frontend changes
 
-- `lib/api/cpp-client.ts`:
+- `lib/api/core.ts` (shared), `lib/api/client.ts` (`apiFetch`, browser) and `lib/api/server.ts` (`apiFetchServer`, server). Split so Client Components never import `next/headers`:
   - `export type ApiResult<T> = { success: true; data: T } | { success: false; error: string }`
   - `apiFetch<T>(path: string, init?: RequestInit): Promise<ApiResult<T>>`
   - Token source: browser → `lib/supabase/client.ts` `getSession()`; server → `lib/supabase/server.ts` `getSession()`. (Session token only forwarded; the C++ service does the authoritative verification.)
@@ -168,7 +168,7 @@ Missing required var → log the var name, exit code 1. Returns `std::expected<C
 
 1. `ctest` passes (unit always; integration with compose Postgres).
 2. Docker image builds and `/healthz` responds in the container.
-3. Deployed on Fly with secrets set; from the deployed Vercel app, a logged-in user's `apiFetch('/me')` returns their own UUID.
+3. Deployed on Fly with secrets set; `GET https://<vercel-domain>/cpp-api/me` with a real user's access token (from Supabase's password grant) returns that user's UUID.
 4. `npm run build` and `npm test` still pass for the Next app.
 
 ## 4. Out of scope (for sub-project 1)
