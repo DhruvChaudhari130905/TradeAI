@@ -56,6 +56,15 @@ describe('requestApi', () => {
     expect(headers.get('Content-Type')).toBe('application/json')
   })
 
+  it('lets fetch set Content-Type for FormData bodies', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ success: true, data: null }))
+    const form = new FormData()
+    form.append('file', new Blob(['x']), 'doc.pdf')
+    await requestApi('/cpp-api/x', 'tok', { method: 'POST', body: form })
+    const headers = fetchMock.mock.calls[0][1].headers as Headers
+    expect(headers.has('Content-Type')).toBe(false)
+  })
+
   it('maps a non-JSON response to the generic error', async () => {
     fetchMock.mockResolvedValue(new Response('<html>502</html>', { status: 502 }))
     await expect(requestApi('/cpp-api/me', 'tok')).resolves.toEqual({

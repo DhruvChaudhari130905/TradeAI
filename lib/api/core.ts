@@ -17,7 +17,8 @@ export async function requestApi<T>(
   try {
     const headers = new Headers(init.headers)
     if (token) headers.set('Authorization', `Bearer ${token}`)
-    if (init.body !== undefined && !headers.has('Content-Type')) {
+    // Only string bodies default to JSON; fetch sets the type for FormData, Blob, etc.
+    if (typeof init.body === 'string' && !headers.has('Content-Type')) {
       headers.set('Content-Type', 'application/json')
     }
     const res = await fetch(url, { ...init, headers, cache: 'no-store' })

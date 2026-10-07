@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <atomic>
+#include <future>
 #include <thread>
 #include <vector>
 
@@ -170,4 +171,50 @@ TEST_F(JwtVerifierTest, ConcurrentVerificationIsSafe) {
   for (auto& thread : threads) thread.join();
   EXPECT_EQ(accepted.load(), 200);
   EXPECT_EQ(fetcher->calls(), 1);
+}
+
+namespace {
+
+// Serves the initial key set immediately, then blocks every later fetch until released.
+class SlowJwksFetcher final : public auth::JwksFetcher {
+ public:
+  explicit SlowJwksFetcher(std::string body) : body_(std::move(body)) {}
+  std::string fetch() override {
+    if (calls_++ > 0) {
+      entered_.set_value();
+      release_.wait();
+    }
+    return body_;
+  }
+  std::shared_future<void> entered() { return enteredFuture_; }
+  void release() { releasePromise_.set_value(); }
+
+ private:
+  std::string body_;
+  std::atomic<int> calls_{0};
+  std::promise<void> entered_;
+  std::shared_future<void> enteredFuture_ = entered_.get_future().share();
+  std::promise<void> releasePromise_;
+  std::shared_future<void> release_ = releasePromise_.get_future().share();
+};
+
+}  // namespace
+
+TEST_F(JwtVerifierTest, CachedKeyVerificationDoesNotWaitOnSlowRefresh) {
+  auto slow = std::make_shared<SlowJwksFetcher>(jwksJson({key}));
+  JwtVerifier verifier({.issuer = kIssuer}, slow, [this] { return now; });
+  ASSERT_TRUE(verifier.verify(signEs256(key)));  // first fetch: caches key-1
+
+  now += 31s;  // past the unknown-kid cooldown, still within the key cache TTL
+  auto unknown = std::async(std::launch::async,
+                            [&] { return verifier.verify(signEs256(makeEcKey("key-2"))); });
+  slow->entered().wait();  // the refresh for key-2 is now in flight
+
+  const auto token = signEs256(key);
+  auto cached = std::async(std::launch::async, [&] { return verifier.verify(token); });
+  const bool finished = cached.wait_for(2s) == std::future_status::ready;
+  slow->release();
+  EXPECT_TRUE(finished) << "verification with a cached key blocked on the JWKS refresh";
+  EXPECT_TRUE(cached.get());
+  expectError(unknown.get(), AuthError::UnknownKey);
 }

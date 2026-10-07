@@ -4,6 +4,7 @@
 #include <expected>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <shared_mutex>
 #include <string>
@@ -54,9 +55,11 @@ class JwtVerifier {
   std::shared_ptr<JwksFetcher> fetcher_;
   Clock clock_;
 
-  std::shared_mutex mutex_;
+  std::shared_mutex mutex_;  // guards keys_ and fetchedAt_
   KeySet keys_;
-  std::optional<std::chrono::steady_clock::time_point> fetchedAt_;    // last successful fetch
+  std::optional<std::chrono::steady_clock::time_point> fetchedAt_;  // last successful fetch
+
+  std::mutex refreshMutex_;  // serializes JWKS refreshes; guards lastAttempt_
   std::optional<std::chrono::steady_clock::time_point> lastAttempt_;  // last fetch attempt
 };
 

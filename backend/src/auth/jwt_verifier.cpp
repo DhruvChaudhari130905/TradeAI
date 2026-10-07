@@ -25,37 +25,42 @@ JwtVerifier::JwtVerifier(JwtVerifierOptions options, std::shared_ptr<JwksFetcher
 
 std::expected<PublicKey, AuthError> JwtVerifier::keyFor(const std::string& kid) {
   const auto now = clock_();
-  const auto lookup = [&]() -> std::optional<PublicKey> {
+  const auto lookup = [&](bool allowStale) -> std::optional<PublicKey> {
+    std::shared_lock lock(mutex_);
+    if (!allowStale && !(fetchedAt_ && now - *fetchedAt_ < options_.keyCacheTtl)) return std::nullopt;
     auto it = keys_.find(kid);
     if (it == keys_.end()) return std::nullopt;
     return it->second;
   };
-  const auto isFresh = [&] { return fetchedAt_ && now - *fetchedAt_ < options_.keyCacheTtl; };
 
-  {
-    std::shared_lock lock(mutex_);
-    if (isFresh()) {
-      if (auto key = lookup()) return *key;
-    }
+  if (auto key = lookup(false)) return *key;
+
+  // One refresh at a time. The fetch runs without holding mutex_, so verifications
+  // using cached keys never wait on the network.
+  std::unique_lock refresh(refreshMutex_, std::defer_lock);
+  if (!refresh.try_lock()) {
+    // A refresh is already running: use a stale key rather than wait for it.
+    if (auto key = lookup(true)) return *key;
+    refresh.lock();
   }
-
-  std::unique_lock lock(mutex_);
   // Another thread may have refreshed the keys while we waited for the lock.
-  if (isFresh()) {
-    if (auto key = lookup()) return *key;
-  }
+  if (auto key = lookup(false)) return *key;
+
   const bool coolingDown = lastAttempt_ && now - *lastAttempt_ < options_.unknownKidCooldown;
   if (!coolingDown) {
     lastAttempt_ = now;
     try {
-      keys_ = parseJwks(fetcher_->fetch());
+      auto fresh = parseJwks(fetcher_->fetch());
+      std::unique_lock lock(mutex_);
+      keys_ = std::move(fresh);
       fetchedAt_ = now;
     } catch (const std::exception& e) {
       CROW_LOG_WARNING << "[jwks] refresh failed: " << e.what();
     }
   }
   // Falls back to stale keys if a refresh failed or is rate-limited.
-  if (auto key = lookup()) return *key;
+  if (auto key = lookup(true)) return *key;
+  std::shared_lock lock(mutex_);
   return std::unexpected(fetchedAt_ ? AuthError::UnknownKey : AuthError::KeysUnavailable);
 }
 

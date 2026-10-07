@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <nlohmann/json.hpp>
+
 #include "auth/jwks.h"
 #include "support/test_tokens.h"
 
@@ -27,4 +29,14 @@ TEST(ParseJwks, EmptyKeySet) { EXPECT_TRUE(auth::parseJwks(R"({"keys":[]})").emp
 TEST(ParseJwks, ThrowsOnMalformedJson) {
   EXPECT_ANY_THROW(auth::parseJwks("not json"));
   EXPECT_ANY_THROW(auth::parseJwks(R"({"nokeys":true})"));
+}
+
+TEST(ParseJwks, SkipsMalformedKeysButKeepsValidOnes) {
+  auto doc = nlohmann::json::parse(tradeai::testing::jwksJson({tradeai::testing::makeEcKey("good")}));
+  doc["keys"].push_back({{"kty", "EC"}, {"crv", "P-256"}, {"kid", 5}, {"x", "AA"}, {"y", "AA"}});
+  doc["keys"].push_back({{"kty", "EC"}, {"crv", "P-256"}, {"kid", "no-y"}, {"x", "AA"}});
+  doc["keys"].push_back({{"kty", "RSA"}, {"kid", "bad-n"}, {"n", 1}, {"e", "AQAB"}});
+  auto keys = auth::parseJwks(doc.dump());
+  ASSERT_EQ(keys.size(), 1u);
+  EXPECT_TRUE(keys.contains("good"));
 }
