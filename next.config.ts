@@ -49,6 +49,11 @@ const nextConfig: NextConfig = {
   // pdfjs-dist must NOT be bundled — it loads a worker file via a
   // relative path that only resolves correctly in node_modules.
   serverExternalPackages: ['pdfjs-dist', 'pdf-parse-fork'],
+  // Browser calls to the C++ API go through the same origin (no CORS); see lib/api/client.ts.
+  async rewrites() {
+    const cppApiUrl = process.env.CPP_API_URL
+    return cppApiUrl ? [{ source: '/cpp-api/:path*', destination: `${cppApiUrl}/:path*` }] : []
+  },
   async headers() {
     return [
       {
