@@ -5,26 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { deleteTrade } from '@/lib/actions/trades'
 import { toast } from 'sonner'
-import {
-  ArrowUpRight,
-  ArrowDownRight,
-  Pencil,
-  Trash2,
-  Loader2,
-  X,
-  Calendar,
-  Clock,
-  Target,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  Tag,
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
+import { ArrowLeft, Pencil, Trash2, Loader2, X } from 'lucide-react'
+import { Button, buttonVariants } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -34,7 +16,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { StatStrip } from '@/components/ui/stat-strip'
 import { ReviewPanel } from '@/components/journal/ReviewPanel'
+import { DirectionTag, OutcomeBadge } from '@/components/journal/TradeBadges'
+import { formatPrice, formatRR, formatSigned, formatUsd, pnlTone } from '@/lib/format'
+import { pipSize } from '@/lib/replay/execution'
 import type { Trade } from '@/lib/types/trade'
 
 interface TradeDetailClientProps {
@@ -49,8 +35,11 @@ export function TradeDetailClient({ trade }: TradeDetailClientProps) {
   const [expandedImg, setExpandedImg] = useState<string | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
 
-  const pnl = Number(trade.pnl_usd) || 0
-  const isLong = trade.direction === 'long'
+  const pnl = trade.pnl_usd != null ? Number(trade.pnl_usd) : null
+  const isBacktest = trade.source === 'backtest'
+  const ps = pipSize(trade.pair, trade.market)
+  const distPips = (a: number | null | undefined) =>
+    a != null && trade.entry_price != null ? Math.abs(Number(a) - Number(trade.entry_price)) / ps : null
 
   const handleDelete = () => {
     startTransition(async () => {
@@ -68,219 +57,155 @@ export function TradeDetailClient({ trade }: TradeDetailClientProps) {
   const formatDate = (d: string | null | undefined) =>
     d ? new Date(d).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '—'
 
-  const formatNum = (n: number | null | undefined, decimals = 2) =>
-    n != null ? Number(n).toFixed(decimals) : '—'
+  const duration = (() => {
+    if (!trade.entry_time || !trade.exit_time) return null
+    const mins = Math.round((new Date(trade.exit_time).getTime() - new Date(trade.entry_time).getTime()) / 60000)
+    if (mins < 0) return null
+    if (mins < 60) return `${mins}m`
+    const h = Math.floor(mins / 60)
+    return h < 48 ? `${h}h ${mins % 60}m` : `${Math.floor(h / 24)}d ${h % 24}h`
+  })()
+
+  const stopPips = distPips(trade.stop_loss)
+  const targetPips = distPips(trade.take_profit)
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-7xl space-y-5">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-3">
-          <Link
-            href="/journal"
-            className="text-sm text-zinc-500 transition-colors hover:text-white"
-          >
-            ← Journal
-          </Link>
-          <Separator orientation="vertical" className="h-4" />
-          <h1 className="text-2xl font-bold tracking-tight text-white">
-            <span className="font-mono">{trade.pair}</span>
-          </h1>
-          <Badge
-            variant="outline"
-            className={`gap-1 ${isLong ? 'border-[#00FF9C]/30 text-[#00FF9C]' : 'border-[#FF4D4D]/30 text-[#FF4D4D]'}`}
-          >
-            {isLong ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-            {trade.direction.toUpperCase()}
-          </Badge>
-          {trade.outcome && (
-            <Badge
-              variant="outline"
-              className={
-                trade.outcome === 'win'
-                  ? 'border-[#00FF9C]/30 bg-[#00FF9C]/5 text-[#00FF9C]'
-                  : trade.outcome === 'loss'
-                    ? 'border-[#FF4D4D]/30 bg-[#FF4D4D]/5 text-[#FF4D4D]'
-                    : trade.outcome === 'breakeven'
-                      ? 'border-yellow-500/30 bg-yellow-500/5 text-yellow-400'
-                      : 'border-zinc-700 text-zinc-500'
-              }
-            >
-              {trade.outcome.charAt(0).toUpperCase() + trade.outcome.slice(1)}
-            </Badge>
-          )}
-        </div>
-        <div className="flex gap-2 sm:ml-auto">
-          <Link href={`/journal/${trade.id}/edit`}>
-            <Button variant="outline" size="sm" className="gap-1.5 border-zinc-800 text-zinc-400 hover:text-white">
-              <Pencil className="h-3.5 w-3.5" />
+      <div>
+        <Link
+          href="/journal"
+          className="inline-flex items-center gap-1 rounded text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> Journal
+        </Link>
+        <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <h1 className="font-mono text-2xl font-semibold tracking-tight text-foreground">{trade.pair}</h1>
+            <DirectionTag direction={trade.direction} className="text-sm" />
+            <OutcomeBadge outcome={trade.outcome} />
+            {isBacktest && (
+              <span className="inline-flex h-5 items-center rounded border border-border px-1.5 text-xs text-muted-foreground">Replay</span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Link href={`/journal/${trade.id}/edit`} className={buttonVariants({ variant: 'outline', className: 'gap-1.5' })}>
+              <Pencil className="h-3.5 w-3.5" aria-hidden />
               Edit
-            </Button>
-          </Link>
-          <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-            <DialogTrigger
-              render={
-                <Button variant="outline" size="sm" className="gap-1.5 border-[#FF4D4D]/30 text-[#FF4D4D] hover:bg-[#FF4D4D]/10" />
-              }
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              Delete
-            </DialogTrigger>
-            <DialogContent className="border-zinc-800 bg-[#12141A] text-white">
-              <DialogHeader>
-                <DialogTitle>Delete Trade</DialogTitle>
-                <DialogDescription className="text-zinc-400">
-                  This will permanently delete this trade and all associated screenshots. This action cannot be undone.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter className="gap-2">
-                <Button variant="outline" onClick={() => setDeleteOpen(false)} className="border-zinc-800 text-zinc-400">
-                  Cancel
-                </Button>
-                <Button onClick={handleDelete} disabled={isPending} className="bg-[#FF4D4D] text-white hover:bg-[#FF4D4D]/90">
-                  {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Delete
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+            </Link>
+            <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+              <DialogTrigger render={<Button variant="destructive" className="gap-1.5" />}>
+                <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                Delete
+              </DialogTrigger>
+              <DialogContent className="border-border bg-card text-foreground">
+                <DialogHeader>
+                  <DialogTitle>Delete this trade?</DialogTitle>
+                  <DialogDescription className="text-muted-foreground">
+                    The {trade.pair} trade, its screenshots and its AI review will be permanently deleted.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter className="gap-2">
+                  <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+                    Keep trade
+                  </Button>
+                  <Button onClick={handleDelete} disabled={isPending} className="bg-loss text-white hover:bg-loss/90">
+                    {isPending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+                    Delete trade
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </div>
 
-      {/* Trade Data — top section, full width two-column grid */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Prices Card */}
-        <Card className="border-zinc-800 bg-[#12141A]">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-zinc-400">Prices & Levels</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-              <Field label="Entry Price" value={formatNum(trade.entry_price)} mono />
-              <Field label="Exit Price" value={formatNum(trade.exit_price)} mono />
-              <Field
-                label="Stop Loss"
-                value={formatNum(trade.stop_loss)}
-                mono
-                valueClass={trade.stop_loss ? 'text-[#FF4D4D]' : undefined}
-              />
-              <Field label="Take Profit" value={formatNum(trade.take_profit)} mono />
-              <Field
-                label="R:R Ratio"
-                value={trade.risk_reward_ratio ? `1:${Number(trade.risk_reward_ratio).toFixed(2)}` : '—'}
-                mono
-                valueClass={
-                  trade.risk_reward_ratio
-                    ? Number(trade.risk_reward_ratio) >= 2
-                      ? 'text-[#00FF9C]'
-                      : Number(trade.risk_reward_ratio) >= 1
-                        ? 'text-yellow-400'
-                        : 'text-[#FF4D4D]'
-                    : undefined
-                }
-              />
-              <Field label="Lot Size" value={formatNum(trade.lot_size)} mono />
-            </div>
-          </CardContent>
-        </Card>
+      {/* Key figures */}
+      <StatStrip
+        items={[
+          { label: 'P&L', value: trade.outcome === 'open' ? 'Open' : formatUsd(pnl, { signed: true }), tone: pnlTone(pnl) },
+          { label: 'Pips', value: formatSigned(trade.pnl_pips != null ? Number(trade.pnl_pips) : null), tone: pnlTone(pnl) },
+          { label: 'Planned R:R', value: formatRR(trade.risk_reward_ratio) },
+          { label: 'Lot size', value: trade.lot_size != null ? Number(trade.lot_size).toFixed(2) : '—' },
+        ]}
+      />
 
-        {/* Outcome Card */}
-        <Card className="border-zinc-800 bg-[#12141A]">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-zinc-400">Outcome</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <Field
-                label="PnL (USD)"
-                value={pnl !== 0 ? `$${pnl.toFixed(2)}` : '—'}
-                mono
-                valueClass={pnl > 0 ? 'text-[#00FF9C]' : pnl < 0 ? 'text-[#FF4D4D]' : undefined}
-              />
-              <Field label="PnL (Pips)" value={trade.pnl_pips != null ? formatNum(trade.pnl_pips, 1) : '—'} mono />
-              <Field
-                label={trade.source === 'backtest' ? 'Replay Entry Time' : 'Entry Time'}
-                value={formatDate(trade.entry_time)}
-                icon={<Clock className="h-3.5 w-3.5 text-zinc-500" />}
-              />
-              <Field
-                label={trade.source === 'backtest' ? 'Replay Exit Time' : 'Exit Time'}
-                value={formatDate(trade.exit_time)}
-                icon={<Clock className="h-3.5 w-3.5 text-zinc-500" />}
-              />
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        {/* Levels */}
+        <section className="rounded-lg border border-border bg-card" aria-labelledby="levels-heading">
+          <h2 id="levels-heading" className="border-b border-border px-4 py-3 text-sm font-semibold text-foreground sm:px-5">Levels</h2>
+          <dl className="divide-y divide-border">
+            <LevelRow label="Entry" value={formatPrice(trade.entry_price, trade.pair, trade.market)} />
+            <LevelRow label="Exit" value={formatPrice(trade.exit_price, trade.pair, trade.market)} />
+            <LevelRow
+              label="Stop loss"
+              value={formatPrice(trade.stop_loss, trade.pair, trade.market)}
+              note={stopPips != null ? `${stopPips.toFixed(1)} pips risk` : 'No stop set'}
+              warn={trade.stop_loss == null}
+            />
+            <LevelRow
+              label="Take profit"
+              value={formatPrice(trade.take_profit, trade.pair, trade.market)}
+              note={targetPips != null ? `${targetPips.toFixed(1)} pips target` : undefined}
+            />
+          </dl>
+        </section>
+
+        {/* Timing & context */}
+        <section className="rounded-lg border border-border bg-card" aria-labelledby="context-heading">
+          <h2 id="context-heading" className="border-b border-border px-4 py-3 text-sm font-semibold text-foreground sm:px-5">Timing &amp; context</h2>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 px-4 py-4 sm:px-5">
+            <Field label={isBacktest ? 'Entry (replay time)' : 'Entry'} value={formatDate(trade.entry_time)} />
+            <Field label={isBacktest ? 'Exit (replay time)' : 'Exit'} value={formatDate(trade.exit_time)} />
+            <Field label="Duration" value={duration ?? '—'} mono />
+            <Field label="Session" value={trade.session ? SESSION_LABELS[trade.session] : '—'} />
+            <Field label="Market" value={trade.market === 'forex' ? 'Forex' : 'Crypto'} />
+            <Field label={isBacktest ? 'Logged' : 'Created'} value={formatDate(trade.created_at)} />
+          </dl>
+          {trade.tags && trade.tags.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 border-t border-border px-4 py-3 sm:px-5">
+              <span className="sr-only">Tags:</span>
+              {trade.tags.map((tag) => (
+                <span key={tag} className="rounded border border-border bg-muted px-1.5 py-0.5 text-xs text-foreground">
+                  {tag}
+                </span>
+              ))}
             </div>
-            {/* Details metadata row */}
-            <div className="mt-4 border-t border-zinc-800 pt-4">
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Market" value={trade.market.toUpperCase()} />
-                <Field label="Session" value={trade.session ? trade.session.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : '—'} />
-                <Field
-                  label={trade.source === 'backtest' ? 'Logged (Real Time)' : 'Created'}
-                  value={formatDate(trade.created_at)}
-                />
-                <Field label="Updated" value={formatDate(trade.updated_at)} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          )}
+        </section>
       </div>
 
       {/* Notes */}
       {trade.notes && (
-        <Card className="border-zinc-800 bg-[#12141A]">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-zinc-400">Notes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="whitespace-pre-wrap text-sm text-zinc-300">{trade.notes}</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Tags */}
-      {trade.tags && trade.tags.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <Tag className="h-3.5 w-3.5 text-zinc-500" />
-          {trade.tags.map((tag) => (
-            <Badge key={tag} variant="outline" className="border-zinc-700 text-zinc-400">
-              {tag}
-            </Badge>
-          ))}
-        </div>
+        <section className="rounded-lg border border-border bg-card px-4 py-4 sm:px-5" aria-labelledby="notes-heading">
+          <h2 id="notes-heading" className="text-sm font-semibold text-foreground">Notes</h2>
+          <p className="mt-2 max-w-[75ch] whitespace-pre-wrap text-sm leading-relaxed text-foreground text-pretty">{trade.notes}</p>
+        </section>
       )}
 
       {/* Screenshots */}
       {trade.screenshot_urls && trade.screenshot_urls.length > 0 && (
-        <Card className="border-zinc-800 bg-[#12141A]">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-zinc-400">Screenshots</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <section className="rounded-lg border border-border bg-card px-4 py-4 sm:px-5" aria-labelledby="shots-heading">
+          <h2 id="shots-heading" className="mb-3 text-sm font-semibold text-foreground">Screenshots</h2>
+          <div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {trade.screenshot_urls.map((url) => (
                 <button
                   key={url}
                   type="button"
                   onClick={() => setExpandedImg(url)}
-                  className="overflow-hidden rounded-md border border-zinc-800 transition-colors hover:border-zinc-600"
+                  className="overflow-hidden rounded-md border border-border transition-colors hover:border-line-strong"
                 >
-                  <img src={url} alt="Trade screenshot" className="h-32 w-full object-cover" />
+                  <img src={url} alt={`${trade.pair} chart screenshot`} className="aspect-video w-full object-cover" />
                 </button>
               ))}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       )}
 
       {/* AI Review — full-width bottom section */}
-      <Card className="border-zinc-800 bg-[#12141A]">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold text-zinc-400">AI Review</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ReviewPanel tradeId={trade.id} existingReview={trade.trade_reviews?.[0] ?? null} />
-        </CardContent>
-      </Card>
+      <ReviewPanel tradeId={trade.id} existingReview={trade.trade_reviews?.[0] ?? null} />
 
       {/* Expanded screenshot overlay */}
       {expandedImg && (
@@ -291,7 +216,8 @@ export function TradeDetailClient({ trade }: TradeDetailClientProps) {
           <button
             type="button"
             onClick={() => setExpandedImg(null)}
-            className="absolute right-4 top-4 rounded-full bg-[#12141A] p-2 text-white transition-colors hover:bg-[#1C1E26]"
+            aria-label="Close screenshot"
+            className="absolute right-4 top-4 rounded-full bg-card p-2 text-foreground transition-colors hover:bg-muted"
           >
             <X className="h-5 w-5" />
           </button>
@@ -307,28 +233,31 @@ export function TradeDetailClient({ trade }: TradeDetailClientProps) {
   )
 }
 
-function Field({
-  label,
-  value,
-  mono,
-  valueClass,
-  icon,
-}: {
-  label: string
-  value: string
-  mono?: boolean
-  valueClass?: string
-  icon?: React.ReactNode
-}) {
+const SESSION_LABELS: Record<NonNullable<Trade['session']>, string> = {
+  london: 'London',
+  new_york: 'New York',
+  asian: 'Asian',
+  overlap: 'London/NY overlap',
+  other: 'Other',
+}
+
+function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="space-y-1">
-      <Label className="text-xs text-zinc-500">{label}</Label>
-      <div className="flex items-center gap-1.5">
-        {icon}
-        <span className={`text-sm ${mono ? 'font-mono' : ''} ${valueClass ?? 'text-white'}`}>
-          {value}
-        </span>
-      </div>
+    <div className="min-w-0">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className={`mt-0.5 truncate text-sm text-foreground ${mono ? 'font-mono' : ''}`}>{value}</dd>
+    </div>
+  )
+}
+
+function LevelRow({ label, value, note, warn }: { label: string; value: string; note?: string; warn?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 px-4 py-2.5 sm:px-5">
+      <dt className="text-sm text-muted-foreground">{label}</dt>
+      <dd className="flex items-baseline gap-3 text-right">
+        {note && <span className={`text-xs ${warn ? 'text-warn' : 'text-muted-foreground'}`}>{note}</span>}
+        <span className="w-28 font-mono text-sm text-foreground">{value}</span>
+      </dd>
     </div>
   )
 }

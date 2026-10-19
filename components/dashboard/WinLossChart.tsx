@@ -8,7 +8,7 @@ const COLORS: Record<string, string> = {
   Win: '#00FF9C',
   Loss: '#FF4D4D',
   Breakeven: '#F59E0B',
-  Open: '#71717A',
+  Open: '#8A8A94',
 }
 
 interface WinLossChartProps {
@@ -38,9 +38,9 @@ export function WinLossChart({ trades }: WinLossChartProps) {
 
   if (data.length === 0) {
     return (
-      <Card className="border-zinc-800 bg-[#12141A]">
-        <CardContent className="flex h-72 items-center justify-center p-6">
-          <p className="text-sm text-zinc-500">No outcome data yet</p>
+      <Card className="border-border bg-card">
+        <CardContent className="flex h-72 items-center justify-center p-5">
+          <p className="text-sm text-muted-foreground">No outcome data yet</p>
         </CardContent>
       </Card>
     )
@@ -49,9 +49,9 @@ export function WinLossChart({ trades }: WinLossChartProps) {
   const total = data.reduce((sum, d) => sum + d.value, 0)
 
   return (
-    <Card className="border-zinc-800 bg-[#12141A]">
-      <CardContent className="p-6">
-        <h3 className="mb-4 text-sm font-semibold text-white">Win / Loss</h3>
+    <Card className="border-border bg-card">
+      <CardContent className="p-5">
+        <h3 className="mb-4 text-sm font-semibold text-foreground">Win / Loss</h3>
         <div className="flex items-center gap-6">
           <div style={{ width: '60%', height: 200, minHeight: 200 }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -64,13 +64,13 @@ export function WinLossChart({ trades }: WinLossChartProps) {
                 outerRadius={85}
                 paddingAngle={3}
                 dataKey="value"
-                animationDuration={800}
+                animationDuration={300}
                 stroke="none"
               >
                 {data.map((entry) => (
                   <Cell
                     key={entry.name}
-                    fill={COLORS[entry.name] || '#71717A'}
+                    fill={COLORS[entry.name] || '#8A8A94'}
                   />
                 ))}
               </Pie>
@@ -98,8 +98,8 @@ export function WinLossChart({ trades }: WinLossChartProps) {
                   className="h-3 w-3 rounded-full"
                   style={{ backgroundColor: COLORS[entry.name] }}
                 />
-                <span className="text-xs text-zinc-400">{entry.name}</span>
-                <span className="font-mono text-xs font-semibold text-white">
+                <span className="text-xs text-muted-foreground">{entry.name}</span>
+                <span className="font-mono text-xs font-semibold text-foreground">
                   {entry.value}
                 </span>
               </div>

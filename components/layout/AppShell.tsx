@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { TrendingUp } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
-import { NavLinks, Sidebar } from "@/components/layout/Sidebar";
+import { Account, Logo, NavLinks, Sidebar } from "@/components/layout/Sidebar";
 import {
   Sheet,
   SheetContent,
@@ -21,35 +20,33 @@ export function AppShell({ children, username, email }: AppShellProps) {
   const [navOpen, setNavOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-[#0A0B0E]">
+    <div className="flex h-screen bg-background">
       <div className="hidden lg:flex">
-        <Sidebar />
+        <Sidebar username={username} email={email} />
       </div>
 
       <Sheet open={navOpen} onOpenChange={setNavOpen}>
         <SheetContent
           side="left"
-          className="w-72 max-w-[85vw] gap-0 border-zinc-800 bg-[#0A0B0E] p-0 text-zinc-200"
+          className="flex w-72 max-w-[85vw] flex-col gap-0 border-border bg-card p-0 text-foreground"
         >
-          <SheetHeader className="border-b border-zinc-800 px-4 py-0">
-            <SheetTitle className="flex h-14 items-center gap-2 text-lg font-bold tracking-tight text-white">
-              <TrendingUp className="h-5 w-5 text-[#00FF9C]" />
-              TradeAI
+          <SheetHeader className="px-4 py-0">
+            <SheetTitle className="flex h-14 items-center">
+              <Logo />
             </SheetTitle>
           </SheetHeader>
-          <nav className="space-y-1 px-3 py-4">
+          <nav className="flex-1 space-y-0.5 px-2 py-2" aria-label="Main">
             <NavLinks onNavigate={() => setNavOpen(false)} />
           </nav>
+          <Account username={username} email={email} />
         </SheetContent>
       </Sheet>
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <Navbar
-          username={username}
-          email={email}
-          onMenuClick={() => setNavOpen(true)}
-        />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
+        <Navbar onMenuClick={() => setNavOpen(true)} />
+        <main className="flex-1 overflow-y-auto px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+          {children}
+        </main>
       </div>
     </div>
   );

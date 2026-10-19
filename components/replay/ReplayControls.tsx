@@ -53,7 +53,7 @@ export function ReplayControls({
           onClick={onToggleReverse}
           disabled={!canRewind}
           aria-pressed={reversing}
-          className={`h-10 w-10 ${reversing ? 'bg-amber-400 text-[#0A0B0E] hover:bg-amber-400/90' : 'bg-[#00FF9C] text-[#0A0B0E] hover:bg-[#00FF9C]/90'}`}
+          className={`h-10 w-10 ${reversing ? 'bg-amber-400 text-primary-foreground hover:bg-amber-400/90' : 'bg-primary text-primary-foreground hover:bg-primary/90'}`}
           title={reversing ? 'Stop reverse' : 'Reverse play — rewind chart'}
         >
           <Rewind className="h-4 w-4" />
@@ -63,7 +63,7 @@ export function ReplayControls({
           onClick={onPlayPause}
           disabled={!hasMoreBars || reversing}
           aria-pressed={playing}
-          className={`h-10 w-10 ${playing ? 'bg-[#FF4D4D] text-[#0A0B0E] hover:bg-[#FF4D4D]/90' : 'bg-[#00FF9C] text-[#0A0B0E] hover:bg-[#00FF9C]/90'}`}
+          className={`h-10 w-10 ${playing ? 'bg-loss text-primary-foreground hover:bg-loss/90' : 'bg-primary text-primary-foreground hover:bg-primary/90'}`}
           title={playing ? 'Pause (Space)' : 'Play (Space)'}
         >
           {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
@@ -73,14 +73,14 @@ export function ReplayControls({
           variant="outline"
           onClick={onStep}
           disabled={!hasMoreBars || playing}
-          className="h-10 w-10 border-[#27272A]"
+          className="h-10 w-10 border-border"
           title="Next bar (→)"
         >
           <StepForward className="h-4 w-4" />
         </Button>
 
         {/* Speed */}
-        <div className="flex items-center gap-1 rounded-md border border-[#27272A] px-2 py-1">
+        <div className="flex items-center gap-1 rounded-md border border-border px-2 py-1">
           {SPEEDS.map((s) => (
             <button
               key={s}
@@ -88,7 +88,7 @@ export function ReplayControls({
               onClick={() => onSpeedChange(s)}
               aria-pressed={speed === s}
               className={`rounded px-2 py-1.5 font-mono text-xs transition-colors ${
-                speed === s ? 'bg-[#00FF9C]/15 text-[#00FF9C]' : 'text-zinc-500 hover:text-zinc-300'
+                speed === s ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               {s}x
@@ -97,7 +97,7 @@ export function ReplayControls({
         </div>
 
         {/* Timeframe tabs */}
-        <div className="flex items-center gap-1 rounded-md border border-[#27272A] p-1">
+        <div className="flex items-center gap-1 rounded-md border border-border p-1">
           {timeframes.map((tf) => (
             <button
               key={tf}
@@ -105,7 +105,7 @@ export function ReplayControls({
               onClick={() => onTfChange(tf)}
               aria-pressed={activeTf === tf}
               className={`rounded px-3 py-1.5 font-mono text-xs transition-colors ${
-                activeTf === tf ? 'bg-[#00FF9C]/15 text-[#00FF9C]' : 'text-zinc-400 hover:text-zinc-200'
+                activeTf === tf ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               {tf}
@@ -114,7 +114,7 @@ export function ReplayControls({
         </div>
 
         {/* Current candle clock */}
-        <span className="ml-auto font-mono text-xs text-zinc-400">
+        <span className="ml-auto font-mono text-xs text-muted-foreground">
           {currentBarTime ? new Date(
             /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(currentBarTime)
               ? `${currentBarTime.replace(' ', 'T')}Z`

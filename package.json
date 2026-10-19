@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
+    "dev:api": "cd backend && cmake --preset debug && cmake --build --preset debug && set -a && . ./.env && set +a && ./build/debug/tradeai_api",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

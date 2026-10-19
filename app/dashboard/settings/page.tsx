@@ -169,7 +169,7 @@ export default function SettingsPage() {
 
   if (profileLoading) {
     return (
-      <div className="flex h-64 items-center justify-center gap-2 text-zinc-400">
+      <div className="flex h-64 items-center justify-center gap-2 text-muted-foreground">
         <Loader2 className="h-5 w-5 animate-spin" />
         <span>Loading settings…</span>
       </div>
@@ -180,39 +180,41 @@ export default function SettingsPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-white">Settings</h1>
-        <p className="mt-1 text-sm text-zinc-400">
+        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">Settings</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Manage your profile, security, and account.
         </p>
       </div>
 
       {/* ── Profile Section ── */}
-      <Card className="border-zinc-800 bg-[#12141A]">
-        <CardContent className="p-6">
+      <Card className="border-border bg-card">
+        <CardContent className="p-5">
           <div className="flex items-center gap-2 mb-6">
-            <User className="h-4 w-4 text-[#00FF9C]" />
-            <h2 className="text-sm font-semibold text-white">Profile</h2>
+            <User className="h-4 w-4 text-muted-foreground" aria-hidden />
+            <h2 className="text-sm font-semibold text-foreground">Profile</h2>
           </div>
 
           {/* Avatar */}
           <div className="flex items-center gap-4 mb-6">
             <button
+              type="button"
+              aria-label={avatarUrl ? 'Change avatar' : 'Upload avatar'}
               onClick={() => fileInputRef.current?.click()}
-              className="relative group flex h-16 w-16 items-center justify-center rounded-full border-2 border-dashed border-zinc-700 bg-[#0A0B0E] overflow-hidden transition-colors hover:border-[#00FF9C]/50"
+              className="relative group flex h-16 w-16 items-center justify-center rounded-full border-2 border-dashed border-line-strong bg-background overflow-hidden transition-colors hover:border-primary/50"
             >
               {avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
               ) : (
-                <User className="h-6 w-6 text-zinc-600" />
+                <User className="h-6 w-6 text-muted-foreground" />
               )}
               <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Upload className="h-4 w-4 text-white" />
+                <Upload className="h-4 w-4 text-foreground" />
               </div>
             </button>
             <div>
-              <p className="text-sm text-white">Avatar</p>
-              <p className="text-xs text-zinc-500">Click to upload (max 2MB)</p>
+              <p className="text-sm text-foreground">Avatar</p>
+              <p className="text-xs text-muted-foreground">PNG or JPG, up to 2 MB</p>
             </div>
             <input
               ref={fileInputRef}
@@ -225,11 +227,13 @@ export default function SettingsPage() {
 
           {/* Username */}
           <div className="space-y-2 mb-4">
-            <Label className="text-xs text-zinc-400">Username</Label>
+            <Label htmlFor="username" className="text-xs text-muted-foreground">Username</Label>
             <Input
+              id="username"
+              autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="border-zinc-800 bg-[#0A0B0E] text-white placeholder:text-zinc-600"
+              className="border-border bg-background text-foreground placeholder:text-muted-foreground"
               placeholder="Your username"
             />
           </div>
@@ -238,13 +242,13 @@ export default function SettingsPage() {
             <Button
               onClick={handleProfileSave}
               disabled={profileSaving}
-              className="gap-2 bg-[#00FF9C] text-[#0A0B0E] hover:bg-[#00FF9C]/90"
+              className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {profileSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-              Save Profile
+              Save profile
             </Button>
             {profileMessage && (
-              <span className={`text-xs ${profileMessage.type === 'success' ? 'text-[#00FF9C]' : 'text-[#FF4D4D]'}`}>
+              <span role="status" className={`text-xs ${profileMessage.type === 'success' ? 'text-primary' : 'text-loss'}`}>
                 {profileMessage.text}
               </span>
             )}
@@ -253,31 +257,35 @@ export default function SettingsPage() {
       </Card>
 
       {/* ── Security Section ── */}
-      <Card className="border-zinc-800 bg-[#12141A]">
-        <CardContent className="p-6">
+      <Card className="border-border bg-card">
+        <CardContent className="p-5">
           <div className="flex items-center gap-2 mb-6">
-            <Lock className="h-4 w-4 text-[#3B82F6]" />
-            <h2 className="text-sm font-semibold text-white">Security</h2>
+            <Lock className="h-4 w-4 text-muted-foreground" aria-hidden />
+            <h2 className="text-sm font-semibold text-foreground">Security</h2>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 mb-4">
             <div className="space-y-2">
-              <Label className="text-xs text-zinc-400">New Password</Label>
+              <Label htmlFor="new-password" className="text-xs text-muted-foreground">New password</Label>
               <Input
+                id="new-password"
+                autoComplete="new-password"
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="border-zinc-800 bg-[#0A0B0E] text-white placeholder:text-zinc-600"
+                className="border-border bg-background text-foreground placeholder:text-muted-foreground"
                 placeholder="••••••••"
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs text-zinc-400">Confirm Password</Label>
+              <Label htmlFor="confirm-password" className="text-xs text-muted-foreground">Confirm password</Label>
               <Input
+                id="confirm-password"
+                autoComplete="new-password"
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="border-zinc-800 bg-[#0A0B0E] text-white placeholder:text-zinc-600"
+                className="border-border bg-background text-foreground placeholder:text-muted-foreground"
                 placeholder="••••••••"
               />
             </div>
@@ -288,13 +296,13 @@ export default function SettingsPage() {
               onClick={handlePasswordChange}
               disabled={passwordSaving || !newPassword}
               variant="outline"
-              className="gap-2 border-zinc-700 text-zinc-300 hover:bg-[#0A0B0E]"
+              className="gap-2 border-line-strong text-foreground hover:bg-background"
             >
               {passwordSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
-              Update Password
+              Update password
             </Button>
             {passwordMessage && (
-              <span className={`text-xs ${passwordMessage.type === 'success' ? 'text-[#00FF9C]' : 'text-[#FF4D4D]'}`}>
+              <span role="status" className={`text-xs ${passwordMessage.type === 'success' ? 'text-primary' : 'text-loss'}`}>
                 {passwordMessage.text}
               </span>
             )}
@@ -303,13 +311,13 @@ export default function SettingsPage() {
       </Card>
 
       {/* ── Danger Zone ── */}
-      <Card className="border-[#FF4D4D]/20 bg-[#12141A]">
-        <CardContent className="p-6">
+      <Card className="border-loss/20 bg-card">
+        <CardContent className="p-5">
           <div className="flex items-center gap-2 mb-4">
-            <Trash2 className="h-4 w-4 text-[#FF4D4D]" />
-            <h2 className="text-sm font-semibold text-[#FF4D4D]">Danger Zone</h2>
+            <Trash2 className="h-4 w-4 text-loss" />
+            <h2 className="text-sm font-semibold text-loss">Delete account</h2>
           </div>
-          <p className="text-xs text-zinc-400 mb-4">
+          <p className="text-xs text-muted-foreground mb-4">
             Permanently delete your account and all associated data. This action cannot be undone.
           </p>
 
@@ -318,41 +326,42 @@ export default function SettingsPage() {
               render={
                 <Button
                   variant="outline"
-                  className="gap-2 border-[#FF4D4D]/30 text-[#FF4D4D] hover:bg-[#FF4D4D]/10"
+                  className="gap-2 border-loss/30 text-loss hover:bg-loss/10"
                 />
               }
             >
               <Trash2 className="h-4 w-4" />
-              Delete Account
+              Delete account
             </DialogTrigger>
-            <DialogContent className="border-zinc-800 bg-[#12141A]">
+            <DialogContent className="border-border bg-card">
               <DialogHeader>
-                <DialogTitle className="text-white">Delete Account</DialogTitle>
-                <DialogDescription className="text-zinc-400">
+                <DialogTitle className="text-foreground">Delete your account?</DialogTitle>
+                <DialogDescription className="text-muted-foreground">
                   This will permanently delete all your trades, backtests, reviews, and profile data.
-                  Type <span className="font-mono text-[#FF4D4D]">DELETE</span> to confirm.
+                  Type <span className="font-mono text-loss">DELETE</span> to confirm.
                 </DialogDescription>
               </DialogHeader>
               <Input
                 value={deleteConfirm}
                 onChange={(e) => setDeleteConfirm(e.target.value)}
-                placeholder="Type DELETE to confirm"
-                className="border-zinc-800 bg-[#0A0B0E] text-white font-mono"
+                aria-label="Type DELETE to confirm"
+                placeholder="DELETE"
+                className="border-border bg-background text-foreground font-mono"
               />
               <DialogFooter>
                 <Button
                   variant="outline"
                   onClick={() => setDeleteOpen(false)}
-                  className="border-zinc-700 text-zinc-400"
+                  className="border-line-strong text-muted-foreground"
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleDeleteAccount}
                   disabled={deleteConfirm !== 'DELETE' || deleting}
-                  className="bg-[#FF4D4D] text-white hover:bg-[#FF4D4D]/90"
+                  className="bg-loss text-white hover:bg-loss/90"
                 >
-                  {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Delete Forever'}
+                  {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Delete account'}
                 </Button>
               </DialogFooter>
             </DialogContent>

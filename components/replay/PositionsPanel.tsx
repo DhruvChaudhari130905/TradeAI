@@ -46,7 +46,7 @@ export function PositionsPanel({
   largeTargets = false,
 }: PositionsPanelProps) {
   if (positions.length === 0 && orders.length === 0 && closedTrades.length === 0) {
-    return <p className="py-4 text-center text-xs text-zinc-600">No open positions or orders</p>
+    return <p className="py-4 text-center text-xs text-muted-foreground">No open positions or orders</p>
   }
 
   const closedNewestFirst = closedTrades.slice(-20).reverse()
@@ -70,15 +70,15 @@ export function PositionsPanel({
             />
           ))}
           {orders.map((o) => (
-            <div key={o.id} className="flex items-center gap-2 rounded-md border border-[#27272A] bg-[#1C1E26] px-3 py-2">
-              <Badge variant="secondary" className="text-[10px] uppercase">{o.type}</Badge>
-              <span className={`font-mono text-xs ${o.side === 'buy' ? 'text-[#00FF9C]' : 'text-[#FF4D4D]'}`}>
+            <div key={o.id} className="flex items-center gap-2 rounded-md border border-border bg-muted px-3 py-2">
+              <Badge variant="secondary" className="text-[11px] uppercase">{o.type}</Badge>
+              <span className={`font-mono text-xs ${o.side === 'buy' ? 'text-primary' : 'text-loss'}`}>
                 {o.side.toUpperCase()} {o.lotSize} @ {o.price}
               </span>
               <button
                 onClick={() => onCancelOrder(o.id)}
                 aria-label={`Cancel ${o.side} ${o.type} order at ${o.price}`}
-                className={`ml-auto flex items-center justify-center rounded text-zinc-500 hover:bg-[#FF4D4D]/10 hover:text-[#FF4D4D] ${
+                className={`ml-auto flex items-center justify-center rounded text-muted-foreground hover:bg-loss/10 hover:text-loss ${
                   largeTargets ? 'h-11 w-11' : 'h-7 w-7'
                 }`}
               >
@@ -92,30 +92,30 @@ export function PositionsPanel({
       {/* Closed trades this session — newest first, last 20 */}
       {closedNewestFirst.length > 0 && (
         <div>
-          <h4 className="sticky top-0 bg-[#12141A] py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
+          <h4 className="sticky top-0 bg-card py-1 text-xs font-medium text-muted-foreground">
             Closed Trades ({closedTrades.length})
           </h4>
           <div className="max-h-[15rem] space-y-1 overflow-y-auto pr-1">
             {closedNewestFirst.map((t) => (
               <div
                 key={t.id}
-                className="flex items-center gap-2 rounded-md border border-[#27272A] bg-[#161820] px-3 py-1.5 text-[11px]"
+                className="flex items-center gap-2 rounded-md border border-border bg-raised px-3 py-1.5 text-[11px]"
               >
-                <span className={`font-mono font-semibold ${t.direction === 'long' ? 'text-[#00FF9C]' : 'text-[#FF4D4D]'}`}>
+                <span className={`font-mono font-semibold ${t.direction === 'long' ? 'text-primary' : 'text-loss'}`}>
                   {t.direction.toUpperCase()}
                 </span>
-                <span className="font-mono text-zinc-400">
+                <span className="font-mono text-muted-foreground">
                   {t.entryPrice.toFixed(priceDigits(pair, market))} → {t.exitPrice.toFixed(priceDigits(pair, market))}
                 </span>
                 <span
                   className={`ml-auto font-mono font-semibold ${
-                    t.pnlUsd > 0 ? 'text-[#00FF9C]' : t.pnlUsd < 0 ? 'text-[#FF4D4D]' : 'text-zinc-400'
+                    t.pnlUsd > 0 ? 'text-primary' : t.pnlUsd < 0 ? 'text-loss' : 'text-muted-foreground'
                   }`}
                 >
                   {t.pnlUsd >= 0 ? '+' : ''}${t.pnlUsd.toFixed(2)}
                 </span>
-                <span className="font-mono text-zinc-500">{t.pnlPips.toFixed(1)}p</span>
-                <span className="text-[10px] text-zinc-600">{t.exitReason.replace(/_/g, ' ')}</span>
+                <span className="font-mono text-muted-foreground">{t.pnlPips.toFixed(1)}p</span>
+                <span className="text-[11px] text-muted-foreground">{t.exitReason.replace(/_/g, ' ')}</span>
               </div>
             ))}
           </div>
@@ -166,23 +166,23 @@ function PositionRow({
   }
 
   return (
-    <div className="rounded-md border border-[#27272A] bg-[#1C1E26] px-3 py-2">
+    <div className="rounded-md border border-border bg-muted px-3 py-2">
       <div className="flex items-center gap-2">
         <Badge
           variant="secondary"
-          className={`text-[10px] font-bold ${position.direction === 'long' ? 'bg-[#00FF9C]/10 text-[#00FF9C]' : 'bg-[#FF4D4D]/10 text-[#FF4D4D]'}`}
+          className={`text-[11px] font-bold ${position.direction === 'long' ? 'bg-primary/10 text-primary' : 'bg-loss/10 text-loss'}`}
         >
           {position.direction === 'long' ? 'LONG' : 'SHORT'}
         </Badge>
         <span className="font-mono text-xs">{position.lotSize}</span>
-        <span className="font-mono text-xs text-zinc-400">@ {position.entryPrice.toFixed(digits)}</span>
-        <span className={`ml-auto font-mono text-xs font-bold ${pnl >= 0 ? 'text-[#00FF9C]' : 'text-[#FF4D4D]'}`}>
+        <span className="font-mono text-xs text-muted-foreground">@ {position.entryPrice.toFixed(digits)}</span>
+        <span className={`ml-auto font-mono text-xs font-bold ${pnl >= 0 ? 'text-primary' : 'text-loss'}`}>
           {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}
         </span>
         <button
           onClick={() => onClose(position.id)}
           aria-label={`Close ${position.direction} ${position.lotSize} lots at ${position.entryPrice}`}
-          className={`flex items-center justify-center rounded text-zinc-500 hover:bg-[#FF4D4D]/10 hover:text-[#FF4D4D] ${
+          className={`flex items-center justify-center rounded text-muted-foreground hover:bg-loss/10 hover:text-loss ${
             largeTargets ? 'h-11 w-11' : 'h-7 w-7'
           }`}
         >
@@ -190,7 +190,7 @@ function PositionRow({
         </button>
       </div>
 
-      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[10px] text-zinc-500">
+      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] text-muted-foreground">
         <span>SL {position.stopLoss !== null ? position.stopLoss.toFixed(digits) : '—'}</span>
         <span>TP {position.takeProfit !== null ? position.takeProfit.toFixed(digits) : '—'}</span>
         {position.trailingStopPips !== null && <span className="text-sky-400">trail {position.trailingStopPips}p</span>}
@@ -205,11 +205,11 @@ function PositionRow({
 
         <Button size="sm" variant="outline" onClick={moveBreakeven} disabled={position.breakEvenMoved}
           aria-label="Move stop loss to entry (breakeven)"
-          className={`${largeTargets ? 'h-11 px-3 text-xs' : 'h-6 px-2 text-[10px]'} border-[#27272A]`}>
+          className={`${largeTargets ? 'h-11 px-3 text-xs' : 'h-6 px-2 text-[11px]'} border-border`}>
           BE
         </Button>
         <Button size="sm" variant="outline" onClick={toggleTrailing} aria-pressed={position.trailingStopPips !== null}
-          className={`${largeTargets ? 'h-11 px-3 text-xs' : 'h-6 px-2 text-[10px]'} border-[#27272A] ${position.trailingStopPips !== null ? 'text-sky-400' : ''}`}>
+          className={`${largeTargets ? 'h-11 px-3 text-xs' : 'h-6 px-2 text-[11px]'} border-border ${position.trailingStopPips !== null ? 'text-sky-400' : ''}`}>
           Trail
         </Button>
 
@@ -218,12 +218,12 @@ function PositionRow({
           <DialogTrigger
             render={
               <Button size="sm" variant="outline" disabled={position.lotSize <= 0.01}
-                className={`${largeTargets ? 'h-11 px-3 text-xs' : 'h-6 px-2 text-[10px]'} border-[#27272A]`} />
+                className={`${largeTargets ? 'h-11 px-3 text-xs' : 'h-6 px-2 text-[11px]'} border-border`} />
             }
           >
             Partial
           </DialogTrigger>
-          <DialogContent className="border-[#27272A] bg-[#12141A] sm:max-w-xs">
+          <DialogContent className="border-border bg-card sm:max-w-xs">
             <DialogHeader>
               <DialogTitle className="text-sm">Partial close ({position.lotSize} open)</DialogTitle>
             </DialogHeader>
@@ -234,7 +234,7 @@ function PositionRow({
                   <Button
                     key={pct}
                     variant="outline"
-                    className="border-[#27272A] font-mono"
+                    className="border-border font-mono"
                     onClick={() => {
                       if (lotsToClose >= position.lotSize) {
                         toast.error('Cannot close more than the remaining size.')
@@ -245,7 +245,7 @@ function PositionRow({
                     }}
                   >
                     {pct}%
-                    <span className="block text-[9px] text-zinc-500">{lotsToClose} lots</span>
+                    <span className="block text-[11px] text-muted-foreground">{lotsToClose} lots</span>
                   </Button>
                 )
               })}
@@ -279,13 +279,13 @@ function ModifyDialog({
           <Button
             size="sm"
             variant="outline"
-            className={`${largeTargets ? 'h-11 px-3 text-xs' : 'h-6 px-2 text-[10px]'} border-[#27272A]`}
+            className={`${largeTargets ? 'h-11 px-3 text-xs' : 'h-6 px-2 text-[11px]'} border-border`}
           />
         }
       >
         Modify
       </DialogTrigger>
-      <DialogContent className="border-[#27272A] bg-[#12141A] sm:max-w-xs">
+      <DialogContent className="border-border bg-card sm:max-w-xs">
         <DialogHeader>
           <DialogTitle className="text-sm">Modify SL / TP</DialogTitle>
         </DialogHeader>
@@ -293,15 +293,15 @@ function ModifyDialog({
           <div className="space-y-1">
             <Label className="text-xs">Stop loss</Label>
             <Input type="number" step="any" value={sl} onChange={(e) => setSl(e.target.value)} placeholder="none"
-              className="border-[#27272A] font-mono" />
+              className="border-border font-mono" />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Take profit</Label>
             <Input type="number" step="any" value={tp} onChange={(e) => setTp(e.target.value)} placeholder="none"
-              className="border-[#27272A] font-mono" />
+              className="border-border font-mono" />
           </div>
           <Button
-            className="w-full bg-[#00FF9C] text-[#0A0B0E]"
+            className="w-full bg-primary text-primary-foreground"
             onClick={() => {
               const slNum = parseFloat(sl)
               const tpNum = parseFloat(tp)

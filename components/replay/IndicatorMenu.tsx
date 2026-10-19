@@ -117,31 +117,31 @@ export function IndicatorMenu({ configs, onChange }: IndicatorMenuProps) {
             type="button"
             title="Indicators"
             aria-label="Indicators"
-            className="flex h-7 w-7 items-center justify-center rounded text-zinc-400 transition-colors hover:bg-[#1C1E26] hover:text-zinc-100"
+            className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           />
         }
       >
         <ChartLine className="h-4 w-4" />
       </PopoverTrigger>
-      <PopoverContent side="right" align="start" className="w-64 border-[#27272A] bg-[#12141A] p-3">
-        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">Indicators</h4>
+      <PopoverContent side="right" align="start" className="w-64 border-border bg-card p-3">
+        <h4 className="mb-2 text-sm font-semibold text-foreground">Indicators</h4>
 
-        {configs.length === 0 && <p className="py-1 text-xs text-zinc-600">None added</p>}
+        {configs.length === 0 && <p className="py-1 text-xs text-muted-foreground">None added</p>}
 
         <div className="space-y-2">
           {configs.map((cfg) => (
-            <div key={cfg.id} className="rounded-md border border-[#27272A] bg-[#1C1E26] p-2">
+            <div key={cfg.id} className="rounded-md border border-border bg-muted p-2">
               <div className="flex items-center gap-2">
                 <span className="font-mono text-xs font-medium">{indicatorLabel(cfg)}</span>
                 <button
                   type="button"
                   title={cfg.visible ? 'Hide' : 'Show'}
                   onClick={() => onChange(configs.map((c) => (c.id === cfg.id ? { ...c, visible: !c.visible } : c)))}
-                  className="ml-auto text-zinc-500 hover:text-zinc-100"
+                  className="ml-auto text-muted-foreground hover:text-foreground"
                 >
                   {cfg.visible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
                 </button>
-                <button type="button" title="Remove" onClick={() => removeIndicator(cfg.id)} className="text-zinc-500 hover:text-[#FF4D4D]">
+                <button type="button" title="Remove" onClick={() => removeIndicator(cfg.id)} className="text-muted-foreground hover:text-loss">
                   <X className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -149,13 +149,13 @@ export function IndicatorMenu({ configs, onChange }: IndicatorMenuProps) {
                 <div className="mt-2 grid grid-cols-2 gap-1.5">
                   {NUM_FIELDS[cfg.type].map(({ key, label }) => (
                     <label key={key} className="space-y-0.5">
-                      <span className="block text-[10px] text-zinc-500">{label}</span>
+                      <span className="block text-[11px] text-muted-foreground">{label}</span>
                       <Input
                         type="number"
                         min="1"
                         value={String(cfg.params[key] ?? '')}
                         onChange={(e) => setParam(cfg.id, key, e.target.value)}
-                        className="h-6 border-[#27272A] font-mono text-[11px]"
+                        className="h-6 border-border font-mono text-[11px]"
                       />
                     </label>
                   ))}
@@ -169,7 +169,7 @@ export function IndicatorMenu({ configs, onChange }: IndicatorMenuProps) {
           <div className="mt-3 flex flex-wrap gap-1.5">
             {available.map((type) => (
               <Button key={type} size="sm" variant="outline" onClick={() => addIndicator(type)}
-                className="h-6 border-[#27272A] px-2 text-[11px]">
+                className="h-6 border-border px-2 text-[11px]">
                 <Plus className="mr-0.5 h-3 w-3" /> {LABELS[type]}
               </Button>
             ))}

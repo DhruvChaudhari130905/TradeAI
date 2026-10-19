@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { login, signInWithOAuth } from "@/lib/actions/auth";
 import Link from "next/link";
+import { TrendingUp } from "lucide-react";
 import type { AuthResponse } from "@/lib/types/auth";
 
 const initialState: AuthResponse | null = null;
@@ -11,13 +12,14 @@ export default function LoginPage() {
   const [state, formAction, pending] = useActionState(login, initialState);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0A0B0E] px-4">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold tracking-tight text-white">
-            TradeAI
-          </h1>
-          <p className="mt-2 text-sm text-zinc-400">
+          <Link href="/" className="inline-flex items-center gap-2 rounded" aria-label="TradeAI home">
+            <TrendingUp className="h-6 w-6 text-primary" aria-hidden />
+            <span className="text-xl font-semibold tracking-tight text-foreground">TradeAI</span>
+          </Link>
+          <p className="mt-2 text-sm text-muted-foreground">
             Sign in to your account
           </p>
         </div>
@@ -27,9 +29,9 @@ export default function LoginPage() {
           <form action={async () => { await signInWithOAuth("google") }}>
             <button
               type="submit"
-              className="flex h-10 w-full items-center justify-center gap-3 rounded-md border border-zinc-800 bg-[#12141A] text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+              className="flex h-10 w-full items-center justify-center gap-3 rounded-md border border-border bg-card text-sm font-medium text-foreground transition-colors hover:bg-muted"
             >
-              <svg className="h-4 w-4" viewBox="0 0 24 24">
+              <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
                 <path
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
                   fill="#4285F4"
@@ -54,9 +56,9 @@ export default function LoginPage() {
           <form action={async () => { await signInWithOAuth("apple") }}>
             <button
               type="submit"
-              className="flex h-10 w-full items-center justify-center gap-3 rounded-md border border-zinc-800 bg-[#12141A] text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+              className="flex h-10 w-full items-center justify-center gap-3 rounded-md border border-border bg-card text-sm font-medium text-foreground transition-colors hover:bg-muted"
             >
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C3.79 16.17 4.36 9.63 8.7 9.4c1.23.06 2.08.68 2.8.73.82-.17 1.62-.74 2.71-.67 1.14.07 2.01.56 2.59 1.44-2.34 1.4-1.79 4.48.4 5.36-.56 1.49-1.32 2.96-2.69 4.02h.54zM12.04 9.37c-.15-2.23 1.66-4.07 3.74-4.25.29 2.34-2.13 4.3-3.74 4.25z" />
               </svg>
               Continue with Apple
@@ -67,10 +69,10 @@ export default function LoginPage() {
         {/* Divider */}
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-zinc-800" />
+            <div className="w-full border-t border-border" />
           </div>
           <div className="relative flex justify-center text-xs">
-            <span className="bg-[#0A0B0E] px-2 text-zinc-500">or</span>
+            <span className="bg-background px-2 text-muted-foreground">or</span>
           </div>
         </div>
 
@@ -79,7 +81,7 @@ export default function LoginPage() {
           <div className="space-y-2">
             <label
               htmlFor="email"
-              className="text-sm font-medium text-zinc-300"
+              className="text-sm font-medium text-foreground"
             >
               Email
             </label>
@@ -87,8 +89,9 @@ export default function LoginPage() {
               id="email"
               name="email"
               type="email"
+              autoComplete="email"
               required
-              className="flex h-10 w-full rounded-md border border-zinc-800 bg-[#12141A] px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:border-[#00FF9C]/50 focus:outline-none focus:ring-1 focus:ring-[#00FF9C]/50"
+              className="flex h-10 w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
               placeholder="you@example.com"
             />
           </div>
@@ -96,7 +99,7 @@ export default function LoginPage() {
           <div className="space-y-2">
             <label
               htmlFor="password"
-              className="text-sm font-medium text-zinc-300"
+              className="text-sm font-medium text-foreground"
             >
               Password
             </label>
@@ -104,30 +107,31 @@ export default function LoginPage() {
               id="password"
               name="password"
               type="password"
+              autoComplete="current-password"
               required
-              className="flex h-10 w-full rounded-md border border-zinc-800 bg-[#12141A] px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:border-[#00FF9C]/50 focus:outline-none focus:ring-1 focus:ring-[#00FF9C]/50"
+              className="flex h-10 w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
               placeholder="••••••••"
             />
           </div>
 
           {state && !state.success && (
-            <p className="text-sm text-[#FF4D4D]">{state.error}</p>
+            <p className="text-sm text-loss" role="alert">{state.error}</p>
           )}
 
           <button
             type="submit"
             disabled={pending}
-            className="flex h-10 w-full items-center justify-center rounded-md bg-[#00FF9C] font-medium text-black transition-colors hover:bg-[#00FF9C]/90 disabled:opacity-50"
+            className="flex h-10 w-full items-center justify-center rounded-md bg-primary font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
           >
             {pending ? "Signing in…" : "Sign in"}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-zinc-400">
+        <p className="mt-6 text-center text-sm text-muted-foreground">
           {"Don't have an account? "}
           <Link
             href="/auth/signup"
-            className="text-[#00FF9C] underline-offset-4 hover:underline"
+            className="text-primary underline-offset-4 hover:underline"
           >
             Sign up
           </Link>

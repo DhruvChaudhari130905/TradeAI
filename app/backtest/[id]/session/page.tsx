@@ -134,10 +134,10 @@ export default function ReplaySessionPage({ params }: { params: Promise<{ id: st
   if (error) {
     return (
       <div className="mx-auto max-w-md space-y-4 py-16 text-center">
-        <p className="text-sm text-[#FF4D4D]">{error}</p>
+        <p className="text-sm text-loss">{error}</p>
         <Link
           href="/backtest"
-          className="inline-flex h-9 items-center rounded-md border border-[#27272A] px-4 text-sm hover:bg-[#1C1E26]"
+          className="inline-flex h-9 items-center rounded-md border border-border px-4 text-sm hover:bg-muted"
         >
           Back to sessions
         </Link>
@@ -149,7 +149,7 @@ export default function ReplaySessionPage({ params }: { params: Promise<{ id: st
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-32">
         <ChartLoader />
-        <p role="status" aria-live="polite" className="text-xs text-zinc-500">
+        <p role="status" aria-live="polite" className="text-xs text-muted-foreground">
           {loadNote}
         </p>
       </div>

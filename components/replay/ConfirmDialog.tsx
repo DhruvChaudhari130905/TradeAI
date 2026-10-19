@@ -42,13 +42,13 @@ export function ConfirmDialog({
           <div className="space-y-2 text-sm text-muted-foreground">{description}</div>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading} className="border-[#27272A]">
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading} className="border-border">
             Cancel
           </Button>
           <Button
             onClick={onConfirm}
             disabled={loading}
-            className={destructive ? 'bg-[#FF4D4D] font-bold text-[#0A0B0E] hover:bg-[#FF4D4D]/90' : ''}
+            className={destructive ? 'bg-loss font-bold text-primary-foreground hover:bg-loss/90' : ''}
           >
             {loading ? 'Working…' : confirmLabel}
           </Button>

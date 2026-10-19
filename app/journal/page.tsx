@@ -4,16 +4,32 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { getTrades } from '@/lib/actions/trades'
-import { Plus, Search, TrendingUp, TrendingDown, Minus, BarChart3, Target, Percent, BookOpen } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Plus, Search, X } from 'lucide-react'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Card, CardContent } from '@/components/ui/card'
+import { Segmented } from '@/components/ui/segmented'
+import { StatStrip } from '@/components/ui/stat-strip'
+import { DirectionTag, OutcomeBadge } from '@/components/journal/TradeBadges'
+import { formatRR, formatUsd, pnlTone } from '@/lib/format'
 import type { Trade } from '@/lib/types/trade'
 
 type TradeRow = Trade & {
   trade_reviews: { composite_score: number | null }[]
+}
+
+const ALL = 'all'
+
+const FILTERS = {
+  market: { label: 'Market', options: [['forex', 'Forex'], ['crypto', 'Crypto']] },
+  outcome: { label: 'Result', options: [['win', 'Win'], ['loss', 'Loss'], ['breakeven', 'Breakeven'], ['open', 'Open']] },
+  direction: { label: 'Side', options: [['long', 'Long'], ['short', 'Short']] },
+} as const
+
+function formatWhen(iso: string | null | undefined) {
+  return iso
+    ? new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+    : '—'
 }
 
 export default function JournalPage() {
@@ -24,15 +40,23 @@ export default function JournalPage() {
   const [loading, setLoading] = useState(true)
   const [sourceTab, setSourceTab] = useState<'live' | 'backtest'>('live')
 
-  // Filters
+  // Filters ('' = no filter)
   const [market, setMarket] = useState(searchParams.get('market') ?? '')
   const [outcome, setOutcome] = useState(searchParams.get('outcome') ?? '')
   const [direction, setDirection] = useState(searchParams.get('direction') ?? '')
-  const [pairSearch, setPairSearch] = useState(searchParams.get('pair') ?? '')
+  const [pairInput, setPairInput] = useState(searchParams.get('pair') ?? '')
+  const [pairSearch, setPairSearch] = useState(pairInput)
   const [dateFrom, setDateFrom] = useState(searchParams.get('from') ?? '')
   const [dateTo, setDateTo] = useState(searchParams.get('to') ?? '')
 
+  // Don't hit the server on every keystroke
   useEffect(() => {
+    const id = setTimeout(() => setPairSearch(pairInput.trim()), 250)
+    return () => clearTimeout(id)
+  }, [pairInput])
+
+  useEffect(() => {
+    let cancelled = false
     async function load() {
       setLoading(true)
       const result = await getTrades({
@@ -44,342 +68,246 @@ export default function JournalPage() {
         dateTo: dateTo || undefined,
         source: sourceTab,
       })
-      if (result.success) {
-        setTrades(result.data as TradeRow[])
-      }
+      if (cancelled) return
+      if (result.success) setTrades(result.data as TradeRow[])
       setLoading(false)
     }
     load()
+    return () => { cancelled = true }
   }, [sourceTab, market, outcome, direction, pairSearch, dateFrom, dateTo])
 
-  // Summary stats
   const stats = useMemo(() => {
-    const total = trades.length
     const wins = trades.filter((t) => t.outcome === 'win').length
-    const winRate = total > 0 ? ((wins / total) * 100).toFixed(1) : '0.0'
+    const losses = trades.filter((t) => t.outcome === 'loss').length
     const totalPnl = trades.reduce((sum, t) => sum + (Number(t.pnl_usd) || 0), 0)
-    const rrTrades = trades.filter((t) => t.risk_reward_ratio != null)
-    const avgRR = rrTrades.length > 0
-      ? (rrTrades.reduce((sum, t) => sum + (Number(t.risk_reward_ratio) || 0), 0) / rrTrades.length).toFixed(2)
-      : '—'
-
-    return { total, winRate, totalPnl, avgRR }
+    const rr = trades.map((t) => Number(t.risk_reward_ratio)).filter((n) => Number.isFinite(n) && n > 0)
+    return {
+      total: trades.length,
+      wins,
+      losses,
+      winRate: wins + losses > 0 ? (wins / (wins + losses)) * 100 : null,
+      totalPnl,
+      avgRR: rr.length ? rr.reduce((a, b) => a + b, 0) / rr.length : null,
+    }
   }, [trades])
 
-  const hasFilters = market || outcome || direction || pairSearch || dateFrom || dateTo
+  const hasFilters = Boolean(market || outcome || direction || pairSearch || dateFrom || dateTo)
 
   const clearFilters = () => {
     setMarket('')
     setOutcome('')
     setDirection('')
+    setPairInput('')
     setPairSearch('')
     setDateFrom('')
     setDateTo('')
   }
 
+  const filterState = { market: [market, setMarket], outcome: [outcome, setOutcome], direction: [direction, setDirection] } as const
+
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-7xl space-y-5">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">
-            Trade Journal
-          </h1>
-          <p className="mt-1 text-sm text-zinc-400">
-            Review, filter, and analyze your trading history.
-          </p>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">Journal</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">Every trade you’ve logged, with its AI review score.</p>
         </div>
-        <Link href="/journal/new">
-          <Button className="gap-2 bg-[#00FF9C] text-[#0A0B0E] hover:bg-[#00FF9C]/90">
-            <Plus className="h-4 w-4" />
-            Log Trade
-          </Button>
+        <Link href="/journal/new" className={buttonVariants({ size: 'lg', className: 'gap-1.5 px-3' })}>
+          <Plus className="h-4 w-4" aria-hidden />
+          Log trade
         </Link>
       </div>
 
-      {/* Live / Backtest tabs */}
-      <div className="inline-flex rounded-lg border border-zinc-800 bg-[#12141A] p-0.5">
-        {(['live', 'backtest'] as const).map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setSourceTab(tab)}
-            className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
-              sourceTab === tab ? 'bg-[#00FF9C]/15 text-[#00FF9C]' : 'text-zinc-400 hover:text-white'
-            }`}
-          >
-            {tab === 'live' ? 'Live' : 'Backtest'}
-          </button>
-        ))}
-      </div>
+      <Segmented
+        label="Trade source"
+        size="md"
+        value={sourceTab}
+        onChange={setSourceTab}
+        options={[{ value: 'live', label: 'Live trades' }, { value: 'backtest', label: 'Replay trades' }]}
+      />
 
-      {/* Summary Stats */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Card className="border-zinc-800 bg-[#12141A]">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#00FF9C]/10">
-              <BarChart3 className="h-5 w-5 text-[#00FF9C]" />
-            </div>
-            <div>
-              <p className="text-xs text-zinc-500">Total Trades</p>
-              <p className="font-mono text-xl font-semibold text-white">{stats.total}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-zinc-800 bg-[#12141A]">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#00FF9C]/10">
-              <Percent className="h-5 w-5 text-[#00FF9C]" />
-            </div>
-            <div>
-              <p className="text-xs text-zinc-500">Win Rate</p>
-              <p className="font-mono text-xl font-semibold text-white">{stats.winRate}%</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-zinc-800 bg-[#12141A]">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${stats.totalPnl >= 0 ? 'bg-[#00FF9C]/10' : 'bg-[#FF4D4D]/10'}`}>
-              {stats.totalPnl >= 0 ? (
-                <TrendingUp className="h-5 w-5 text-[#00FF9C]" />
-              ) : (
-                <TrendingDown className="h-5 w-5 text-[#FF4D4D]" />
-              )}
-            </div>
-            <div>
-              <p className="text-xs text-zinc-500">Total PnL</p>
-              <p className={`font-mono text-xl font-semibold ${stats.totalPnl >= 0 ? 'text-[#00FF9C]' : 'text-[#FF4D4D]'}`}>
-                ${stats.totalPnl.toFixed(2)}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-zinc-800 bg-[#12141A]">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#3B82F6]/10">
-              <Target className="h-5 w-5 text-[#3B82F6]" />
-            </div>
-            <div>
-              <p className="text-xs text-zinc-500">Avg R:R</p>
-              <p className="font-mono text-xl font-semibold text-white">1:{stats.avgRR}</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <StatStrip
+        items={[
+          { label: 'Trades', value: String(stats.total), sub: `${stats.wins}W · ${stats.losses}L` },
+          { label: 'Win rate', value: stats.winRate != null ? `${stats.winRate.toFixed(1)}%` : '—', sub: 'of closed trades' },
+          { label: 'Net P&L', value: formatUsd(stats.totalPnl, { signed: true }), tone: pnlTone(stats.totalPnl) },
+          { label: 'Avg planned R:R', value: formatRR(stats.avgRR) },
+        ]}
+      />
 
-      {/* Filter Bar */}
-      <div className="grid grid-cols-2 items-end gap-3 sm:grid-cols-3 lg:flex lg:flex-wrap">
-        <div className="w-full lg:w-36">
-          <Select value={market} onValueChange={(v) => setMarket(v ?? '')}>
-            <SelectTrigger className="h-9 border-zinc-800 bg-[#12141A] text-sm text-white">
-              <SelectValue placeholder="Market" />
-            </SelectTrigger>
-            <SelectContent className="border-zinc-800 bg-[#12141A]">
-              <SelectItem value="__all__" className="text-zinc-500">All</SelectItem>
-              <SelectItem value="forex" className="text-white">Forex</SelectItem>
-              <SelectItem value="crypto" className="text-white">Crypto</SelectItem>
-            </SelectContent>
-          </Select>
+      {/* Filters */}
+      <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-3 lg:flex lg:flex-wrap lg:items-center">
+        <div className="relative col-span-2 sm:col-span-3 lg:w-48">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <Input
+            aria-label="Search by pair"
+            placeholder="Search pair, e.g. EUR"
+            value={pairInput}
+            onChange={(e) => setPairInput(e.target.value)}
+            className="h-9 border-border bg-card pl-8 text-sm"
+          />
         </div>
-        <div className="w-full lg:w-36">
-          <Select value={outcome} onValueChange={(v) => setOutcome(v ?? '')}>
-            <SelectTrigger className="h-9 border-zinc-800 bg-[#12141A] text-sm text-white">
-              <SelectValue placeholder="Outcome" />
-            </SelectTrigger>
-            <SelectContent className="border-zinc-800 bg-[#12141A]">
-              <SelectItem value="__all__" className="text-zinc-500">All</SelectItem>
-              <SelectItem value="win" className="text-white">Win</SelectItem>
-              <SelectItem value="loss" className="text-white">Loss</SelectItem>
-              <SelectItem value="breakeven" className="text-white">Breakeven</SelectItem>
-              <SelectItem value="open" className="text-white">Open</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="w-full lg:w-36">
-          <Select value={direction} onValueChange={(v) => setDirection(v ?? '')}>
-            <SelectTrigger className="h-9 border-zinc-800 bg-[#12141A] text-sm text-white">
-              <SelectValue placeholder="Direction" />
-            </SelectTrigger>
-            <SelectContent className="border-zinc-800 bg-[#12141A]">
-              <SelectItem value="__all__" className="text-zinc-500">All</SelectItem>
-              <SelectItem value="long" className="text-white">Long</SelectItem>
-              <SelectItem value="short" className="text-white">Short</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="w-full lg:w-44">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
-            <Input
-              placeholder="Search pair…"
-              value={pairSearch}
-              onChange={(e) => setPairSearch(e.target.value)}
-              className="h-9 border-zinc-800 bg-[#12141A] pl-8 text-sm text-white placeholder:text-zinc-600"
-            />
-          </div>
-        </div>
-        <Input
-          type="date"
-          value={dateFrom}
-          onChange={(e) => setDateFrom(e.target.value)}
-          className="h-9 w-full border-zinc-800 bg-[#12141A] text-sm text-white lg:w-32"
-        />
-        <Input
-          type="date"
-          value={dateTo}
-          onChange={(e) => setDateTo(e.target.value)}
-          className="h-9 w-full border-zinc-800 bg-[#12141A] text-sm text-white lg:w-32"
-        />
+        {(Object.keys(FILTERS) as (keyof typeof FILTERS)[]).map((key) => {
+          const f = FILTERS[key]
+          const [value, setValue] = filterState[key]
+          return (
+            <div key={key} className="lg:w-36">
+              <Select
+                value={value || ALL}
+                onValueChange={(v) => setValue(!v || v === ALL ? '' : String(v))}
+                items={{ [ALL]: `All ${f.label.toLowerCase()}s`, ...Object.fromEntries(f.options) }}
+              >
+                <SelectTrigger aria-label={f.label} className="h-9 border-border bg-card text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="border-border bg-card">
+                  <SelectItem value={ALL}>All {f.label.toLowerCase()}s</SelectItem>
+                  {f.options.map(([v, l]) => (
+                    <SelectItem key={v} value={v}>{l}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )
+        })}
+        <label className="col-span-1 flex flex-col gap-1 text-xs text-muted-foreground lg:ml-1 lg:flex-row lg:items-center lg:gap-2">
+          From
+          <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 border-border bg-card text-sm lg:w-36" />
+        </label>
+        <label className="col-span-1 flex flex-col gap-1 text-xs text-muted-foreground lg:flex-row lg:items-center lg:gap-2">
+          To
+          <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 border-border bg-card text-sm lg:w-36" />
+        </label>
         {hasFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={clearFilters}
-            className="h-9 text-xs text-zinc-400 hover:text-white sm:w-fit"
-          >
-            Clear filters
+          <Button variant="ghost" onClick={clearFilters} className="h-9 gap-1 text-muted-foreground hover:text-foreground">
+            <X className="h-3.5 w-3.5" aria-hidden />
+            Clear
           </Button>
         )}
       </div>
 
-      {/* Trade List */}
+      {/* Trade list */}
       {loading ? (
-        <div className="py-20 text-center text-sm text-zinc-500">
-          Loading trades…
+        <div className="overflow-hidden rounded-lg border border-border bg-card" aria-busy="true" aria-label="Loading trades">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="flex items-center gap-4 border-b border-border px-4 py-3.5 last:border-0">
+              <div className="h-4 w-20 animate-pulse rounded bg-muted" />
+              <div className="h-4 w-12 animate-pulse rounded bg-muted" />
+              <div className="ml-auto h-4 w-20 animate-pulse rounded bg-muted" />
+            </div>
+          ))}
         </div>
       ) : trades.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#00FF9C]/10 mb-4">
-            <BookOpen className="h-8 w-8 text-[#00FF9C]" />
-          </div>
-          <h2 className="text-lg font-semibold text-white">No trades yet</h2>
-          <p className="mt-1 text-sm text-zinc-500 max-w-sm text-center">
-            Start documenting your trades to track performance, get AI reviews, and unlock analytics.
-          </p>
-          <Link href="/journal/new">
-            <Button className="mt-4 gap-2 bg-[#00FF9C] text-[#0A0B0E] hover:bg-[#00FF9C]/90">
-              <Plus className="h-4 w-4" />
-              Log your first trade
-            </Button>
-          </Link>
+        <div className="rounded-lg border border-border bg-card px-6 py-14 text-center">
+          {hasFilters ? (
+            <>
+              <h2 className="text-sm font-semibold text-foreground">No trades match these filters</h2>
+              <Button variant="outline" onClick={clearFilters} className="mt-4">Clear filters</Button>
+            </>
+          ) : sourceTab === 'backtest' ? (
+            <>
+              <h2 className="text-sm font-semibold text-foreground">No replay trades yet</h2>
+              <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+                Trades you place in a replay session are logged here automatically.
+              </p>
+              <Link href="/backtest" className={buttonVariants({ variant: 'outline', className: 'mt-4' })}>Start a replay</Link>
+            </>
+          ) : (
+            <>
+              <h2 className="text-sm font-semibold text-foreground">Your journal is empty</h2>
+              <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+                Log a trade with its entry, stop and target. Five AI reviewers will score it and name the mistake to fix.
+              </p>
+              <Link href="/journal/new" className={buttonVariants({ className: 'mt-4 gap-1.5' })}>
+                <Plus className="h-4 w-4" aria-hidden /> Log your first trade
+              </Link>
+            </>
+          )}
         </div>
       ) : (
-        <div className="space-y-2">
-          {trades.map((trade) => {
-            const compositeScore = trade.trade_reviews?.[0]?.composite_score
-            const pnl = Number(trade.pnl_usd) || 0
-            return (
-              <Link
-                key={trade.id}
-                href={`/journal/${trade.id}`}
-                className="flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800 bg-[#12141A] px-4 py-3 transition-colors hover:border-zinc-700 sm:flex-nowrap sm:gap-4"
-              >
-                {/* Pair */}
-                <span className="flex min-w-0 flex-1 items-center gap-1.5 font-mono text-sm font-semibold text-white sm:w-24 sm:flex-none">
-                  {trade.pair}
-                  {trade.source === 'backtest' && (
-                    <Badge variant="outline" className="border-sky-500/30 px-1 py-0 text-[9px] uppercase text-sky-400">
-                      BT
-                    </Badge>
-                  )}
-                </span>
+        <>
+          {/* Desktop/tablet: table */}
+          <div className="hidden overflow-hidden rounded-lg border border-border bg-card md:block">
+            <table className="w-full text-sm">
+              <caption className="sr-only">Trades, newest first</caption>
+              <thead>
+                <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                  <th scope="col" className="px-4 py-2.5 font-medium">Pair</th>
+                  <th scope="col" className="px-3 py-2.5 font-medium">Side</th>
+                  <th scope="col" className="px-3 py-2.5 font-medium">Result</th>
+                  <th scope="col" className="px-3 py-2.5 font-medium">{sourceTab === 'backtest' ? 'Entered (replay time)' : 'Entered'}</th>
+                  <th scope="col" className="px-3 py-2.5 text-right font-medium">P&amp;L</th>
+                  <th scope="col" className="px-3 py-2.5 text-right font-medium">R:R</th>
+                  <th scope="col" className="px-4 py-2.5 text-right font-medium">AI score</th>
+                </tr>
+              </thead>
+              <tbody>
+                {trades.map((trade) => {
+                  const score = trade.trade_reviews?.[0]?.composite_score
+                  const pnl = trade.pnl_usd != null ? Number(trade.pnl_usd) : null
+                  return (
+                    <tr
+                      key={trade.id}
+                      onClick={() => router.push(`/journal/${trade.id}`)}
+                      className="cursor-pointer border-b border-border transition-colors duration-150 last:border-0 hover:bg-muted/50"
+                    >
+                      <td className="px-4 py-3">
+                        <Link href={`/journal/${trade.id}`} className="rounded font-mono font-semibold text-foreground" onClick={(e) => e.stopPropagation()}>
+                          {trade.pair}
+                        </Link>
+                      </td>
+                      <td className="px-3 py-3"><DirectionTag direction={trade.direction} /></td>
+                      <td className="px-3 py-3"><OutcomeBadge outcome={trade.outcome} /></td>
+                      <td className="px-3 py-3 text-muted-foreground">{formatWhen(trade.entry_time)}</td>
+                      <td className={`px-3 py-3 text-right font-mono font-semibold ${pnlTone(pnl)}`}>
+                        {trade.outcome === 'open' ? '—' : formatUsd(pnl, { signed: true })}
+                      </td>
+                      <td className="px-3 py-3 text-right font-mono text-muted-foreground">{formatRR(trade.risk_reward_ratio, 1)}</td>
+                      <td className="px-4 py-3 text-right font-mono">
+                        {score != null ? (
+                          <span className="text-foreground">{Number(score).toFixed(1)}</span>
+                        ) : (
+                          <span className="font-sans text-xs text-muted-foreground">Not reviewed</span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
 
-                {/* Direction badge */}
-                <Badge
-                  variant="outline"
-                  className={`w-16 justify-center text-xs ${
-                    trade.direction === 'long'
-                      ? 'border-[#00FF9C]/30 text-[#00FF9C]'
-                      : 'border-[#FF4D4D]/30 text-[#FF4D4D]'
-                  }`}
-                >
-                  {trade.direction.toUpperCase()}
-                </Badge>
-
-                {/* Outcome badge */}
-                <Badge
-                  variant="outline"
-                  className={`w-20 justify-center text-xs ${
-                    trade.outcome === 'win'
-                      ? 'border-[#00FF9C]/30 bg-[#00FF9C]/5 text-[#00FF9C]'
-                      : trade.outcome === 'loss'
-                        ? 'border-[#FF4D4D]/30 bg-[#FF4D4D]/5 text-[#FF4D4D]'
-                        : trade.outcome === 'breakeven'
-                          ? 'border-yellow-500/30 bg-yellow-500/5 text-yellow-400'
-                          : 'border-zinc-700 text-zinc-500'
-                  }`}
-                >
-                  {trade.outcome
-                    ? trade.outcome.charAt(0).toUpperCase() + trade.outcome.slice(1)
-                    : '—'}
-                </Badge>
-
-                {/* Entry time — backtest trades show the replay (data) time plus when it was actually logged */}
-                <span className="hidden w-36 text-sm text-zinc-400 sm:inline">
-                  {trade.source === 'backtest' ? (
-                    <span className="flex flex-col leading-tight">
-                      <span>
-                        {trade.entry_time
-                          ? new Date(trade.entry_time).toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })
-                          : '—'}
+          {/* Phone: two-line rows */}
+          <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card md:hidden">
+            {trades.map((trade) => {
+              const score = trade.trade_reviews?.[0]?.composite_score
+              const pnl = trade.pnl_usd != null ? Number(trade.pnl_usd) : null
+              return (
+                <li key={trade.id}>
+                  <Link href={`/journal/${trade.id}`} className="block px-4 py-3 transition-colors active:bg-muted/50">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="font-mono text-sm font-semibold text-foreground">{trade.pair}</span>
+                        <DirectionTag direction={trade.direction} />
                       </span>
-                      <span className="text-[11px] text-zinc-600">
-                        Logged{' '}
-                        {trade.created_at
-                          ? new Date(trade.created_at).toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })
-                          : '—'}
+                      <span className={`font-mono text-sm font-semibold ${pnlTone(pnl)}`}>
+                        {trade.outcome === 'open' ? '—' : formatUsd(pnl, { signed: true })}
                       </span>
-                    </span>
-                  ) : trade.entry_time ? (
-                    new Date(trade.entry_time).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })
-                  ) : (
-                    '—'
-                  )}
-                </span>
-
-                {/* PnL */}
-                <span
-                  className={`font-mono text-sm font-semibold sm:w-24 ${
-                    pnl > 0 ? 'text-[#00FF9C]' : pnl < 0 ? 'text-[#FF4D4D]' : 'text-zinc-500'
-                  }`}
-                >
-                  {pnl !== 0 ? `$${pnl.toFixed(2)}` : '—'}
-                </span>
-
-                {/* R:R */}
-                <span className="hidden w-16 font-mono text-sm text-zinc-400 sm:inline">
-                  {trade.risk_reward_ratio ? `1:${Number(trade.risk_reward_ratio).toFixed(1)}` : '—'}
-                </span>
-
-                {/* AI Score or "Not reviewed" */}
-                <span className="ml-auto text-sm">
-                  {compositeScore != null ? (
-                    <Badge className="bg-[#00FF9C]/10 text-[#00FF9C]">
-                      {compositeScore}/10
-                    </Badge>
-                  ) : (
-                    <span className="text-xs text-zinc-600">Not reviewed</span>
-                  )}
-                </span>
-              </Link>
-            )
-          })}
-        </div>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-2">
+                        <OutcomeBadge outcome={trade.outcome} />
+                        {formatWhen(trade.entry_time)}
+                      </span>
+                      <span className="font-mono">{score != null ? `AI ${Number(score).toFixed(1)}` : 'Not reviewed'}</span>
+                    </div>
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        </>
       )}
     </div>
   )

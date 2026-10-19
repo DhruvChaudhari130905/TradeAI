@@ -9,8 +9,9 @@ import { WinLossChart } from '@/components/dashboard/WinLossChart'
 import { AiScoreChart } from '@/components/dashboard/AiScoreChart'
 import { RecentTrades } from '@/components/dashboard/RecentTrades'
 import { InsightsPanel } from '@/components/dashboard/InsightsPanel'
-import { Button } from '@/components/ui/button'
-import { LayoutDashboard, BookOpen, FlaskConical, RefreshCw, CalendarDays } from 'lucide-react'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { Segmented } from '@/components/ui/segmented'
+import { BookOpen, FlaskConical, RefreshCw, CalendarDays, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import type { DashboardStats } from '@/lib/actions/dashboard'
 import type { Trade } from '@/lib/types/trade'
@@ -37,43 +38,15 @@ function daysAgo(days: number): Date {
 
 // ── Skeleton loaders ──
 
-function SkeletonCard() {
-  return (
-    <div className="animate-pulse rounded-xl border border-zinc-800 bg-[#12141A] p-5">
-      <div className="flex items-center gap-4">
-        <div className="h-12 w-12 rounded-xl bg-zinc-800" />
-        <div className="space-y-2">
-          <div className="h-3 w-20 rounded bg-zinc-800" />
-          <div className="h-6 w-28 rounded bg-zinc-800" />
-        </div>
-      </div>
-    </div>
-  )
+function SkeletonBlock({ className }: { className: string }) {
+  return <div className={`animate-pulse rounded-md bg-muted ${className}`} />
 }
 
-function SkeletonChart() {
+function SkeletonPanel({ height }: { height: string }) {
   return (
-    <div className="animate-pulse rounded-xl border border-zinc-800 bg-[#12141A] p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className="h-4 w-28 rounded bg-zinc-800" />
-        <div className="h-4 w-16 rounded bg-zinc-800" />
-      </div>
-      <div className="h-60 rounded-lg bg-zinc-800/50" />
-    </div>
-  )
-}
-
-function SkeletonList() {
-  return (
-    <div className="animate-pulse rounded-xl border border-zinc-800 bg-[#12141A] p-6">
-      <div className="h-4 w-28 rounded bg-zinc-800 mb-4" />
-      {[...Array(5)].map((_, i) => (
-        <div key={i} className="flex items-center gap-3 rounded-lg bg-[#0A0B0E] px-3 py-2.5 mb-2">
-          <div className="h-4 w-20 rounded bg-zinc-800" />
-          <div className="h-5 w-14 rounded bg-zinc-800" />
-          <div className="ml-auto h-4 w-16 rounded bg-zinc-800" />
-        </div>
-      ))}
+    <div className="rounded-lg border border-border bg-card p-5">
+      <SkeletonBlock className="mb-4 h-4 w-32" />
+      <SkeletonBlock className={height} />
     </div>
   )
 }
@@ -100,7 +73,9 @@ export default function DashboardPage() {
     setError(null)
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      // Local session read — middleware already verified the JWT, and RLS scopes the queries
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
       if (!user) {
         router.push('/auth/login')
         return
@@ -174,31 +149,25 @@ export default function DashboardPage() {
     [filteredTrades],
   )
 
+  const wins = filteredTrades.filter((t) => t.outcome === 'win').length
+  const losses = filteredTrades.filter((t) => t.outcome === 'loss').length
+  const reviewed = filteredTrades.filter((t) => t.trade_reviews?.[0]?.composite_score != null).length
+
   const isEmpty = allTrades.length === 0
   const hasFilteredResults = filteredTrades.length > 0
 
-  // ── Period switcher ──
-  const periods: TimePeriod[] = ['7d', '30d', '90d', 'all']
 
   // ── Loading state ──
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div>
-          <div className="h-8 w-56 animate-pulse rounded bg-zinc-800" />
-          <div className="mt-2 h-4 w-72 animate-pulse rounded bg-zinc-800" />
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => <SkeletonCard key={i} />)}
-        </div>
+      <div className="mx-auto max-w-7xl space-y-5" aria-busy="true" aria-label="Loading dashboard">
+        <SkeletonBlock className="h-7 w-56" />
+        <SkeletonBlock className="h-[92px] w-full rounded-lg" />
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="lg:col-span-2"><SkeletonChart /></div>
-          <SkeletonChart />
+          <div className="lg:col-span-2"><SkeletonPanel height="h-64" /></div>
+          <SkeletonPanel height="h-64" />
         </div>
-        <SkeletonChart />
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          {[...Array(3)].map((_, i) => <SkeletonList key={i} />)}
-        </div>
+        <SkeletonPanel height="h-48" />
       </div>
     )
   }
@@ -206,83 +175,53 @@ export default function DashboardPage() {
   // ── Error state ──
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-2xl border border-zinc-800 bg-[#12141A] py-20 px-6">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#FF4D4D]/10 mb-6">
-          <LayoutDashboard className="h-8 w-8 text-[#FF4D4D]" />
-        </div>
-        <h2 className="text-lg font-semibold text-white">Something went wrong</h2>
-        <p className="mt-2 max-w-md text-center text-sm text-zinc-400">{error}</p>
-        <Button
-          onClick={() => fetchData()}
-          className="mt-6 gap-2 bg-[#00FF9C] text-[#0A0B0E] hover:bg-[#00FF9C]/90"
-        >
-          <RefreshCw className="h-4 w-4" />
-          Retry
+      <div className="mx-auto flex max-w-7xl flex-col items-center rounded-lg border border-border bg-card px-6 py-16 text-center" role="alert">
+        <AlertTriangle className="h-6 w-6 text-warn" aria-hidden />
+        <h2 className="mt-3 text-base font-semibold text-foreground">Couldn’t load your dashboard</h2>
+        <p className="mt-1 max-w-md text-sm text-muted-foreground">{error}</p>
+        <Button onClick={() => fetchData()} className="mt-5 gap-2">
+          <RefreshCw className="h-4 w-4" aria-hidden />
+          Try again
         </Button>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-7xl space-y-5">
       {/* ── Header ── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
             Welcome back, {profile?.username ?? 'Trader'}
           </h1>
-          <p className="mt-1 text-sm text-zinc-400">
-            {"Here's your trading performance overview."}
-          </p>
+          <p className="mt-0.5 text-sm text-muted-foreground">Your performance at a glance.</p>
         </div>
 
-        {/* Refresh + Period Filter */}
         {!isEmpty && (
           <div className="flex flex-wrap items-center gap-2">
-            {/* Real vs backtested toggle */}
-            <div className="flex items-center gap-1 rounded-lg border border-zinc-800 bg-[#12141A] p-1">
-              {(['live', 'backtest'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setSourceTab(tab)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium capitalize transition-colors ${
-                    sourceTab === tab
-                      ? 'bg-[#00FF9C]/15 text-[#00FF9C]'
-                      : 'text-zinc-500 hover:text-zinc-300'
-                  }`}
-                >
-                  {tab === 'live' ? 'Real' : 'Backtested'}
-                </button>
-              ))}
-            </div>
-
-            {/* Time period pills */}
-            <div className="flex flex-wrap items-center gap-1 rounded-lg border border-zinc-800 bg-[#12141A] p-1">
-              <CalendarDays className="ml-2 h-3.5 w-3.5 text-zinc-500" />
-              {periods.map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setPeriod(p)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                    period === p
-                      ? 'bg-[#00FF9C]/15 text-[#00FF9C]'
-                      : 'text-zinc-500 hover:text-zinc-300'
-                  }`}
-                >
-                  {PERIOD_LABELS[p]}
-                </button>
-              ))}
-            </div>
-
-            {/* Refresh button */}
+            <Segmented
+              label="Trade source"
+              value={sourceTab}
+              onChange={setSourceTab}
+              options={[{ value: 'live', label: 'Real' }, { value: 'backtest', label: 'Backtested' }]}
+            />
+            <Segmented
+              label="Time period"
+              value={period}
+              onChange={setPeriod}
+              options={(Object.keys(PERIOD_LABELS) as TimePeriod[]).map((p) => ({ value: p, label: PERIOD_LABELS[p] }))}
+            />
             <Button
               variant="outline"
               size="icon"
               onClick={() => fetchData(true)}
               disabled={refreshing}
-              className="h-8 w-8 border-zinc-800 bg-[#12141A] text-zinc-400 hover:text-zinc-200"
+              aria-label="Refresh data"
+              title="Refresh data"
+              className="h-8 w-8 border-border bg-card text-muted-foreground hover:text-foreground"
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} aria-hidden />
             </Button>
           </div>
         )}
@@ -290,32 +229,20 @@ export default function DashboardPage() {
 
       {/* ── Empty State (no trades or backtests at all) ── */}
       {isEmpty ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-zinc-800 bg-[#12141A] py-20 px-6">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#00FF9C]/10 mb-6">
-            <LayoutDashboard className="h-8 w-8 text-[#00FF9C]" />
-          </div>
-          <h2 className="text-lg font-semibold text-white">
-            Your command centre awaits
-          </h2>
-          <p className="mt-2 max-w-md text-center text-sm text-zinc-400">
-            Start by logging a trade or running a backtest. Your performance
-            charts, AI insights, and analytics will appear here automatically.
+        <div className="rounded-lg border border-border bg-card px-6 py-14 text-center">
+          <h2 className="text-base font-semibold text-foreground">Nothing to analyse yet</h2>
+          <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+            Log a trade or run a replay session. Your P&amp;L curve, win rate, and AI review scores
+            build up here as you go.
           </p>
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Link href="/journal/new">
-              <Button className="gap-2 bg-[#00FF9C] text-[#0A0B0E] hover:bg-[#00FF9C]/90">
-                <BookOpen className="h-4 w-4" />
-                Log a Trade
-              </Button>
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            <Link href="/journal/new" className={buttonVariants({ size: 'lg', className: 'gap-2 px-3' })}>
+              <BookOpen className="h-4 w-4" aria-hidden />
+              Log a trade
             </Link>
-            <Link href="/backtest">
-              <Button
-                variant="outline"
-                className="gap-2 border-zinc-700 text-zinc-300 hover:bg-[#12141A]"
-              >
-                <FlaskConical className="h-4 w-4" />
-                Run a Backtest
-              </Button>
+            <Link href="/backtest" className={buttonVariants({ variant: 'outline', size: 'lg', className: 'gap-2 px-3' })}>
+              <FlaskConical className="h-4 w-4" aria-hidden />
+              Start a replay
             </Link>
           </div>
         </div>
@@ -323,12 +250,12 @@ export default function DashboardPage() {
         <>
           {/* ── Period Empty State ── */}
           {!hasFilteredResults ? (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-zinc-800 bg-[#12141A] py-16 px-6">
-              <CalendarDays className="h-10 w-10 text-zinc-600 mb-4" />
-              <h3 className="text-sm font-semibold text-white">
+            <div className="flex flex-col items-center rounded-lg border border-border bg-card px-6 py-14 text-center">
+              <CalendarDays className="mb-3 h-6 w-6 text-muted-foreground" aria-hidden />
+              <h3 className="text-sm font-semibold text-foreground">
                 No {sourceTab === 'live' ? 'real' : 'backtested'} trades{period !== 'all' ? ' in this period' : ''}
               </h3>
-              <p className="mt-1 text-sm text-zinc-500">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {period !== 'all'
                   ? `None of your ${sourceTab === 'live' ? 'real' : 'backtested'} trades fall within the last ${
                       period === '7d' ? '7 days' : period === '30d' ? '30 days' : '90 days'
@@ -338,7 +265,7 @@ export default function DashboardPage() {
               <Button
                 variant="ghost"
                 onClick={() => setPeriod('all')}
-                className="mt-4 text-xs text-[#00FF9C] hover:text-[#00FF9C]/80"
+                className="mt-4 text-xs text-primary hover:text-primary/80"
               >
                 View all time →
               </Button>
@@ -346,7 +273,7 @@ export default function DashboardPage() {
           ) : (
             <>
               {/* ── Stats Cards ── */}
-              <StatsCards stats={stats} />
+              <StatsCards stats={stats} wins={wins} losses={losses} reviewed={reviewed} />
 
               {/* ── Charts Row ── */}
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

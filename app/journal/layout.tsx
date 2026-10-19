@@ -8,7 +8,8 @@ export default async function JournalLayout({
   children: React.ReactNode
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data } = await supabase.auth.getClaims()
+  const user = data?.claims
 
   if (!user) {
     redirect('/auth/login')
@@ -17,7 +18,7 @@ export default async function JournalLayout({
   const { data: profile } = await supabase
     .from('profiles')
     .select('username')
-    .eq('id', user.id)
+    .eq('id', user.sub)
     .single()
 
   return (

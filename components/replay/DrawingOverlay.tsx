@@ -944,13 +944,13 @@ export function DrawingOverlay({
       {selectedShape && anyBadgePos && (
         <div
           data-drawing-badge
-          className="absolute z-30 flex items-center gap-1 rounded-md border border-[#27272A] bg-[#12141A]/95 px-1 py-1 shadow-lg"
+          className="absolute z-30 flex items-center gap-1 rounded-md border border-border bg-card/95 px-1 py-1 shadow-lg"
           style={{ left: Math.max(4, Math.min(anyBadgePos.x, size.w - 180)), top: Math.max(4, anyBadgePos.y - 40) }}
         >
           {selectedShape.kind === 'long_position' || selectedShape.kind === 'short_position' ? (
             <button
               type="button"
-              className="flex items-center gap-1 rounded bg-[#00FF9C] px-2 py-1 text-[11px] font-bold text-[#0A0B0E] hover:bg-[#00FF9C]/85"
+              className="flex items-center gap-1 rounded bg-primary px-2 py-1 text-[11px] font-bold text-primary-foreground hover:bg-primary/85"
               onClick={() => {
                 onExecute(selectedShape)
                 setSelectedId(null)
@@ -963,7 +963,7 @@ export function DrawingOverlay({
             type="button"
             title="Delete drawing"
             aria-label="Delete drawing"
-            className="flex h-6 w-6 items-center justify-center rounded text-zinc-400 hover:bg-[#FF4D4D]/10 hover:text-[#FF4D4D]"
+            className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-loss/10 hover:text-loss"
             onClick={() => {
               onErase(selectedShape.id)
               setSelectedId(null)
@@ -976,7 +976,7 @@ export function DrawingOverlay({
       {textDraft && (
         <div
           data-drawing-badge
-          className="absolute z-40 flex items-center gap-1 rounded-md border border-[#27272A] bg-[#12141A]/95 p-1 shadow-lg"
+          className="absolute z-40 flex items-center gap-1 rounded-md border border-border bg-card/95 p-1 shadow-lg"
           style={{
             left: Math.max(4, Math.min(textDraft.x, Math.max(4, size.w - 200))),
             top: Math.max(4, Math.min(textDraft.y - 16, Math.max(4, size.h - 44))),
@@ -999,14 +999,14 @@ export function DrawingOverlay({
               onBlur={commitTextDraft}
               placeholder={textDraft.id ? 'Edit label' : 'Label text'}
               aria-label="Text annotation label"
-              className="h-7 w-40 rounded border border-[#27272A] bg-[#0A0B0E] px-2 text-xs text-zinc-100 outline-none focus:border-[#00FF9C]/50"
+              className="h-7 w-40 rounded border border-border bg-background px-2 text-xs text-foreground outline-none focus:border-primary/50"
             />
           </form>
           <button
             type="button"
             onMouseDown={(e) => e.preventDefault()}
             onClick={commitTextDraft}
-            className="rounded bg-[#00FF9C] px-2 py-1 text-[11px] font-bold text-[#0A0B0E] hover:bg-[#00FF9C]/85"
+            className="rounded bg-primary px-2 py-1 text-[11px] font-bold text-primary-foreground hover:bg-primary/85"
           >
             Save
           </button>

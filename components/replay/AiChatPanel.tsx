@@ -156,7 +156,7 @@ export function AiChatPanel({
       <ScrollArea className="mt-2 min-h-0 flex-1 pr-1">
         <div ref={scrollRef} className="space-y-3">
           {chatMessages.length === 0 && (
-            <p className="py-4 text-center text-xs text-zinc-600">
+            <p className="py-4 text-center text-xs text-muted-foreground">
               Ask about your setup, risk, or what you see on the chart — the coach also chimes in on its own after notable moments.
             </p>
           )}
@@ -165,12 +165,12 @@ export function AiChatPanel({
               <div
                 className={`max-w-[90%] whitespace-pre-wrap rounded-lg px-3 py-2 text-xs leading-relaxed ${
                   m.role === 'user'
-                    ? 'bg-[#00FF9C]/10 text-zinc-100'
-                    : 'bg-[#1C1E26] text-zinc-300'
+                    ? 'bg-primary/10 text-foreground'
+                    : 'bg-muted text-foreground'
                 }`}
               >
                 {m.proactive && (
-                  <span className="mb-1 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[#00FF9C]/70">
+                  <span className="mb-1 flex items-center gap-1 text-xs font-medium text-primary">
                     <Zap className="h-3 w-3" /> Coach suggestion
                   </span>
                 )}
@@ -180,19 +180,19 @@ export function AiChatPanel({
           ))}
           {sending && streamingText === null && (
             <div className="flex items-center gap-1.5 px-1 py-2" role="status" aria-label="Coach is thinking">
-              <span className="coach-dot inline-block h-1.5 w-1.5 rounded-full bg-[#00FF9C]" />
-              <span className="coach-dot inline-block h-1.5 w-1.5 rounded-full bg-[#00FF9C]" style={{ animationDelay: '0.15s' }} />
-              <span className="coach-dot inline-block h-1.5 w-1.5 rounded-full bg-[#00FF9C]" style={{ animationDelay: '0.3s' }} />
-              <span className="ml-1 text-xs text-zinc-500">Coach is thinking…</span>
+              <span className="coach-dot inline-block h-1.5 w-1.5 rounded-full bg-primary" />
+              <span className="coach-dot inline-block h-1.5 w-1.5 rounded-full bg-primary" style={{ animationDelay: '0.15s' }} />
+              <span className="coach-dot inline-block h-1.5 w-1.5 rounded-full bg-primary" style={{ animationDelay: '0.3s' }} />
+              <span className="ml-1 text-xs text-muted-foreground">Coach is thinking…</span>
             </div>
           )}
           {streamingText !== null && (
             <div className="flex justify-start">
-              <div className="coach-glow max-w-[90%] whitespace-pre-wrap rounded-lg bg-[#1C1E26] px-3 py-2 text-xs leading-relaxed">
-                <span className={streamingText ? 'coach-shimmer' : 'text-zinc-300'}>
+              <div className="coach-glow max-w-[90%] whitespace-pre-wrap rounded-lg bg-muted px-3 py-2 text-xs leading-relaxed">
+                <span className={streamingText ? 'coach-shimmer' : 'text-foreground'}>
                   {streamingText || '…'}
                 </span>
-                <span className="ml-0.5 inline-block h-3 w-1.5 animate-pulse bg-[#00FF9C]/70 align-middle" />
+                <span className="ml-0.5 inline-block h-3 w-1.5 animate-pulse bg-primary/70 align-middle" />
               </div>
             </div>
           )}
@@ -211,10 +211,10 @@ export function AiChatPanel({
           }}
           placeholder="Ask the coach…"
           rows={2}
-          className="min-h-0 resize-none border-[#27272A] bg-[#1C1E26] text-xs"
+          className="min-h-0 resize-none border-border bg-muted text-xs"
         />
         <Button size="icon" onClick={() => void send()} disabled={sending || input.trim().length === 0}
-          className="h-9 w-9 shrink-0 bg-[#00FF9C] text-[#0A0B0E] hover:bg-[#00FF9C]/90">
+          className="h-9 w-9 shrink-0 bg-primary text-primary-foreground hover:bg-primary/90">
           <SendHorizonal className="h-4 w-4" />
         </Button>
       </div>
@@ -235,9 +235,9 @@ export function AiChatPanelHeader({
   return (
     <div className="flex shrink-0 items-center gap-1.5">
       <Sparkles
-        className={`h-3.5 w-3.5 text-[#00FF9C] ${active ? 'animate-pulse' : ''}`}
+        className={`h-3.5 w-3.5 text-primary ${active ? 'animate-pulse' : ''}`}
       />
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">AI Coach</h3>
+      <h3 className="text-sm font-semibold text-foreground">AI Coach</h3>
       {onToggleAutoCoach && (
         <button
           type="button"
@@ -245,10 +245,10 @@ export function AiChatPanelHeader({
           aria-checked={autoCoach}
           aria-label="Auto-coach: proactive suggestions"
           onClick={onToggleAutoCoach}
-          className={`ml-auto flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] transition-colors ${
+          className={`ml-auto flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] transition-colors ${
             autoCoach
-              ? 'border-[#00FF9C]/40 bg-[#00FF9C]/10 text-[#00FF9C]'
-              : 'border-[#27272A] text-zinc-500 hover:text-zinc-300'
+              ? 'border-primary/40 bg-primary/10 text-primary'
+              : 'border-border text-muted-foreground hover:text-foreground'
           }`}
         >
           <Zap className="h-3 w-3" />

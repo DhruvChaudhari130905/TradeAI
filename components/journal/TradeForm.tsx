@@ -9,14 +9,14 @@ import type { TradeImageExtraction, ExtractField, ExtractedFieldValue } from '@/
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { Check, Plus, Trash2, Upload, X, ArrowUpRight, ArrowDownRight, Loader2 } from 'lucide-react'
+import { Check, Upload, X, ArrowUpRight, ArrowDownRight, Loader2, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { pipSize, priceDigits } from '@/lib/replay/execution'
 import type { Trade } from '@/lib/types/trade'
 
 interface TradeFormProps {
@@ -124,6 +124,20 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
 
   const rr = computeRR()
 
+  // Risk readout in pips — visible before the trade is logged
+  const watchMarket = watch('market')
+  const ps = watchPair ? pipSize(watchPair, watchMarket) : null
+  const pipsFrom = (level: unknown) => {
+    const entry = Number(watchEntryPrice)
+    const v = Number(level)
+    if (!ps || !entry || !v) return null
+    return Math.abs(entry - v) / ps
+  }
+  const stopPips = pipsFrom(watchStopLoss)
+  const targetPips = pipsFrom(watchTakeProfit)
+  const hasEntry = Number(watchEntryPrice) > 0
+  const pricePlaceholder = watchPair ? (0).toFixed(priceDigits(watchPair, watchMarket)) : '0.00000'
+
   const onFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.length) await uploadFiles(e.target.files)
     if (fileInputRef.current) fileInputRef.current.value = ''
@@ -210,10 +224,10 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
     if (!importResult) return ''
     const fv = importResult.fields[field]
     if (!fv || fv.value === null || (Array.isArray(fv.value) && fv.value.length === 0)) return ''
-    if (field === 'notes' || field === 'tags') return 'ring-2 ring-[#00FF9C]/60'
-    if (fv.confidence === 'extracted') return 'ring-2 ring-[#3B82F6]/70'
+    if (field === 'notes' || field === 'tags') return 'ring-2 ring-primary/60'
+    if (fv.confidence === 'extracted') return 'ring-2 ring-info/70'
     if (fv.confidence === 'guessed') {
-      return confirmedFields.has(field) ? 'ring-2 ring-[#3B82F6]/70' : 'ring-2 ring-amber-400'
+      return confirmedFields.has(field) ? 'ring-2 ring-info/70' : 'ring-2 ring-warn'
     }
     return ''
   }
@@ -300,17 +314,17 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
     >
       {/* Extraction review strip — legend + confirm guessed values */}
       {importResult && (
-        <div className="space-y-2 rounded-lg border border-zinc-800 bg-[#0A0B0E] p-3">
+        <div className="space-y-2 rounded-lg border border-border bg-background p-3">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
             {(
               [
-                ['Verified from image', 'bg-[#3B82F6]'],
-                ['Guessed — confirm below', 'bg-amber-400'],
-                ['Not found', 'bg-zinc-500'],
-                ['AI draft', 'bg-[#00FF9C]'],
+                ['Verified from image', 'bg-info'],
+                ['Guessed — confirm below', 'bg-warn'],
+                ['Not found', 'bg-muted-foreground'],
+                ['AI draft', 'bg-primary'],
               ] as const
             ).map(([label, cls]) => (
-              <span key={label} className="inline-flex items-center gap-1.5 text-xs text-zinc-400">
+              <span key={label} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                 <span className={cn('h-2.5 w-2.5 rounded-full', cls)} />
                 {label}
               </span>
@@ -322,7 +336,7 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
               variant="ghost"
               disabled={importing || screenshots.length === 0}
               onClick={() => runExtraction(screenshots[0])}
-              className="h-6 px-2 text-[11px] text-zinc-400"
+              className="h-6 px-2 text-[11px] text-muted-foreground"
             >
               Retry
             </Button>
@@ -331,14 +345,14 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
               size="sm"
               variant="ghost"
               onClick={() => setImportResult(null)}
-              className="h-6 px-2 text-[11px] text-zinc-400"
+              className="h-6 px-2 text-[11px] text-muted-foreground"
             >
               Dismiss
             </Button>
           </div>
           {amberFields.length > 0 ? (
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-zinc-400">Tap to confirm:</span>
+              <span className="text-xs text-muted-foreground">Tap to confirm:</span>
               {amberFields.map((f) => {
                 const confirmed = confirmedFields.has(f)
                 return (
@@ -351,8 +365,8 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
                     className={cn(
                       'h-6 gap-1 px-2 text-[11px]',
                       confirmed
-                        ? 'border-[#3B82F6] text-[#3B82F6]'
-                        : 'border-amber-400 text-amber-300',
+                        ? 'border-info text-info'
+                        : 'border-warn text-warn',
                     )}
                   >
                     {confirmed && <Check className="h-3 w-3" />}
@@ -362,79 +376,78 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
               })}
             </div>
           ) : (
-            <div className="text-xs text-[#00FF9C]">All extracted values confirmed.</div>
+            <div className="text-xs text-primary">All extracted values confirmed.</div>
           )}
         </div>
       )}
-      {/* Section 1 — Trade Details */}
-      <Card className="border-zinc-800 bg-[#12141A]">
+      {/* Section 1 — Trade details */}
+      <Card className="border-border bg-card">
         <CardHeader className="pb-4">
-          <CardTitle className="text-base font-semibold text-white">
-            Trade Details
+          <CardTitle className="text-sm font-semibold text-foreground">
+            Trade details
           </CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {/* Pair */}
           <div className="space-y-2 sm:col-span-2">
-            <Label className="text-zinc-400">Pair</Label>
+            <Label htmlFor="pair-select" className="text-muted-foreground">Pair</Label>
             <Select value={watchPair} onValueChange={(v) => v && onPairChange(v)}>
-              <SelectTrigger className={cn('border-zinc-800 bg-[#0A0B0E] text-white', fieldRing('pair'))}>
+              <SelectTrigger id="pair-select" className={cn('border-border bg-background text-foreground', fieldRing('pair'))}>
                 <SelectValue placeholder="Select pair" />
               </SelectTrigger>
-              <SelectContent className="border-zinc-800 bg-[#12141A]">
-                <div className="px-2 py-1.5 text-xs font-medium text-zinc-500">
+              <SelectContent className="border-border bg-card">
+                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
                   Forex
                 </div>
                 {FOREX_PAIRS.map((p) => (
-                  <SelectItem key={p} value={p} className="text-white">
+                  <SelectItem key={p} value={p} className="text-foreground">
                     {p}
                   </SelectItem>
                 ))}
-                <div className="px-2 py-1.5 text-xs font-medium text-zinc-500">
+                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
                   Commodities
                 </div>
                 {COMMODITY_PAIRS.map((p) => (
-                  <SelectItem key={p} value={p} className="text-white">
+                  <SelectItem key={p} value={p} className="text-foreground">
                     {p}
                   </SelectItem>
                 ))}
-                <div className="px-2 py-1.5 text-xs font-medium text-zinc-500">
+                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
                   Crypto
                 </div>
                 {CRYPTO_PAIRS.map((p) => (
-                  <SelectItem key={p} value={p} className="text-white">
+                  <SelectItem key={p} value={p} className="text-foreground">
                     {p}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             {errors.pair && (
-              <p className="text-xs text-[#FF4D4D]">{errors.pair.message}</p>
+              <p className="text-xs text-loss">{errors.pair.message}</p>
             )}
           </div>
 
           {/* Market (auto-detected) */}
           <div className="space-y-2">
-            <Label className="text-zinc-400">Market</Label>
-            <Input
-              value={watch('market')}
-              readOnly
-              className="border-zinc-800 bg-[#0A0B0E] text-zinc-500"
-            />
+            <span className="text-sm font-medium text-muted-foreground">Market</span>
+            <p className="flex h-8 items-center text-sm text-foreground">
+              {watchPair ? (watchMarket === 'crypto' ? 'Crypto' : 'Forex') : <span className="text-muted-foreground">Set by pair</span>}
+            </p>
           </div>
 
           {/* Direction */}
           <div className="space-y-2">
-            <Label className="text-zinc-400">Direction</Label>
-            <div className="flex gap-2">
+            <span id="direction-label" className="text-sm font-medium text-muted-foreground">Direction</span>
+            <div className="flex gap-2" role="group" aria-labelledby="direction-label">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className={`flex-1 gap-1.5 ${
+                aria-pressed={watchDirection === 'long'}
+                className={`h-8 flex-1 gap-1.5 ${
                   watchDirection === 'long'
-                    ? 'border-[#00FF9C] bg-[#00FF9C]/10 text-[#00FF9C]'
-                    : 'border-zinc-800 text-zinc-400'
+                    ? 'border-line-strong bg-muted text-foreground'
+                    : 'border-border text-muted-foreground'
                 } ${fieldRing('direction')}`}
                 onClick={() => setValue('direction', 'long')}
               >
@@ -445,10 +458,11 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
                 type="button"
                 variant="outline"
                 size="sm"
-                className={`flex-1 gap-1.5 ${
+                aria-pressed={watchDirection === 'short'}
+                className={`h-8 flex-1 gap-1.5 ${
                   watchDirection === 'short'
-                    ? 'border-[#FF4D4D] bg-[#FF4D4D]/10 text-[#FF4D4D]'
-                    : 'border-zinc-800 text-zinc-400'
+                    ? 'border-line-strong bg-muted text-foreground'
+                    : 'border-border text-muted-foreground'
                 } ${fieldRing('direction')}`}
                 onClick={() => setValue('direction', 'short')}
               >
@@ -460,31 +474,32 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
 
           {/* Session */}
           <div className="space-y-2">
-            <Label className="text-zinc-400">Session</Label>
+            <Label htmlFor="session-select" className="text-muted-foreground">Session</Label>
             <Select
               value={watch('session') ?? '__none'}
               onValueChange={(v) => setValue('session', v === '__none' || v === null ? undefined : (v as Session))}
+              items={{ __none: 'None', london: 'London', new_york: 'New York', asian: 'Asian', overlap: 'London/NY overlap', other: 'Other' }}
             >
-              <SelectTrigger className={cn('border-zinc-800 bg-[#0A0B0E] text-white', fieldRing('session'))}>
+              <SelectTrigger id="session-select" className={cn('border-border bg-background text-foreground', fieldRing('session'))}>
                 <SelectValue placeholder="Select session" />
               </SelectTrigger>
-              <SelectContent className="border-zinc-800 bg-[#12141A]">
-                <SelectItem value="__none" className="text-zinc-500">
+              <SelectContent className="border-border bg-card">
+                <SelectItem value="__none" className="text-muted-foreground">
                   None
                 </SelectItem>
-                <SelectItem value="london" className="text-white">
+                <SelectItem value="london" className="text-foreground">
                   London
                 </SelectItem>
-                <SelectItem value="new_york" className="text-white">
+                <SelectItem value="new_york" className="text-foreground">
                   New York
                 </SelectItem>
-                <SelectItem value="asian" className="text-white">
+                <SelectItem value="asian" className="text-foreground">
                   Asian
                 </SelectItem>
-                <SelectItem value="overlap" className="text-white">
-                  Overlap
+                <SelectItem value="overlap" className="text-foreground">
+                  London/NY overlap
                 </SelectItem>
-                <SelectItem value="other" className="text-white">
+                <SelectItem value="other" className="text-foreground">
                   Other
                 </SelectItem>
               </SelectContent>
@@ -493,201 +508,214 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
 
           {/* Entry Time */}
           <div className="space-y-2 sm:col-span-2 lg:col-span-3">
-            <Label className="text-zinc-400">Entry Time</Label>
+            <Label htmlFor="entry_time" className="text-muted-foreground">Entry time</Label>
             <Input
               type="datetime-local"
+              id="entry_time"
               {...register('entry_time')}
-              className={cn('border-zinc-800 bg-[#0A0B0E] text-white', fieldRing('entry_time'))}
+              className={cn('border-border bg-background text-foreground', fieldRing('entry_time'))}
             />
           </div>
         </CardContent>
       </Card>
 
       {/* Section 2 — Prices */}
-      <Card className="border-zinc-800 bg-[#12141A]">
+      <Card className="border-border bg-card">
         <CardHeader className="pb-4">
-          <CardTitle className="text-base font-semibold text-white">
+          <CardTitle className="text-sm font-semibold text-foreground">
             Prices
           </CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+        <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
           <div className="space-y-2">
-            <Label className="text-zinc-400">Entry Price</Label>
+            <Label htmlFor="entry_price" className="text-muted-foreground">Entry price</Label>
             <Input
               type="number"
               step="any"
-              placeholder="0.00"
+              placeholder={pricePlaceholder}
+              id="entry_price"
               {...register('entry_price')}
-              className={cn('border-zinc-800 bg-[#0A0B0E] font-mono text-white', fieldRing('entry_price'))}
+              className={cn('border-border bg-background font-mono text-foreground', fieldRing('entry_price'))}
             />
             {errors.entry_price && (
-              <p className="text-xs text-[#FF4D4D]">
+              <p className="text-xs text-loss">
                 {errors.entry_price.message}
               </p>
             )}
           </div>
           <div className="space-y-2">
-            <Label className="text-zinc-400">Exit Price</Label>
+            <Label htmlFor="exit_price" className="text-muted-foreground">Exit price</Label>
             <Input
               type="number"
               step="any"
-              placeholder="0.00"
+              placeholder={pricePlaceholder}
+              id="exit_price"
               {...register('exit_price')}
-              className={cn('border-zinc-800 bg-[#0A0B0E] font-mono text-white', fieldRing('exit_price'))}
+              className={cn('border-border bg-background font-mono text-foreground', fieldRing('exit_price'))}
             />
           </div>
           <div className="space-y-2">
-            <Label className="text-zinc-400">Stop Loss</Label>
+            <Label htmlFor="stop_loss" className="text-muted-foreground">Stop loss</Label>
             <Input
               type="number"
               step="any"
-              placeholder="0.00"
+              placeholder={pricePlaceholder}
+              id="stop_loss"
               {...register('stop_loss')}
-              className={cn('border-zinc-800 bg-[#0A0B0E] font-mono text-white', fieldRing('stop_loss'))}
+              className={cn('border-border bg-background font-mono text-foreground', fieldRing('stop_loss'))}
             />
           </div>
           <div className="space-y-2">
-            <Label className="text-zinc-400">Take Profit</Label>
+            <Label htmlFor="take_profit" className="text-muted-foreground">Take profit</Label>
             <Input
               type="number"
               step="any"
-              placeholder="0.00"
+              placeholder={pricePlaceholder}
+              id="take_profit"
               {...register('take_profit')}
-              className={cn('border-zinc-800 bg-[#0A0B0E] font-mono text-white', fieldRing('take_profit'))}
+              className={cn('border-border bg-background font-mono text-foreground', fieldRing('take_profit'))}
             />
           </div>
           <div className="space-y-2">
-            <Label className="text-zinc-400">Lot Size</Label>
+            <Label htmlFor="lot_size" className="text-muted-foreground">Lot size</Label>
             <Input
               type="number"
               step="any"
               placeholder="0.00"
+              id="lot_size"
               {...register('lot_size')}
-              className={cn('border-zinc-800 bg-[#0A0B0E] font-mono text-white', fieldRing('lot_size'))}
+              className={cn('border-border bg-background font-mono text-foreground', fieldRing('lot_size'))}
             />
           </div>
-          {/* Risk:Reward display */}
-          <div className="space-y-2">
-            <Label className="text-zinc-400">R:R</Label>
-            <div className="flex h-9 items-center rounded-md border border-zinc-800 bg-[#0A0B0E] px-3">
-              {rr ? (
-                <span
-                  className={`font-mono text-sm font-semibold ${
-                    Number(rr) >= 2 ? 'text-[#00FF9C]' : Number(rr) >= 1 ? 'text-yellow-400' : 'text-[#FF4D4D]'
-                  }`}
-                >
-                  1:{rr}
-                </span>
-              ) : (
-                <span className="text-sm text-zinc-600">—</span>
-              )}
-            </div>
+          {/* Risk readout — distances in pips and planned R:R, before the trade is logged */}
+          <div className="col-span-2 sm:col-span-3 lg:col-span-5" aria-live="polite">
+            {hasEntry && !watchStopLoss ? (
+              <p className="flex items-center gap-2 rounded-md border border-warn/30 bg-warn/10 px-3 py-2 text-sm text-foreground">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-warn" aria-hidden />
+                No stop loss set. Reviewers treat an unprotected trade as a risk-management failure.
+              </p>
+            ) : (
+              <dl className="flex flex-wrap gap-x-6 gap-y-1 rounded-md border border-border bg-background px-3 py-2 text-sm">
+                <div className="flex gap-2"><dt className="text-muted-foreground">Stop</dt><dd className="font-mono text-foreground">{stopPips != null ? `${stopPips.toFixed(1)} pips` : '—'}</dd></div>
+                <div className="flex gap-2"><dt className="text-muted-foreground">Target</dt><dd className="font-mono text-foreground">{targetPips != null ? `${targetPips.toFixed(1)} pips` : '—'}</dd></div>
+                <div className="flex gap-2">
+                  <dt className="text-muted-foreground">Planned R:R</dt>
+                  <dd className={cn('font-mono', rr && Number(rr) < 1 ? 'text-warn' : 'text-foreground')}>{rr ? `1:${rr}` : '—'}</dd>
+                </div>
+              </dl>
+            )}
           </div>
         </CardContent>
       </Card>
 
       {/* Section 3 — Outcome */}
-      <Card className="border-zinc-800 bg-[#12141A]">
+      <Card className="border-border bg-card">
         <CardHeader className="pb-4">
-          <CardTitle className="text-base font-semibold text-white">
+          <CardTitle className="text-sm font-semibold text-foreground">
             Outcome
           </CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-2">
-            <Label className="text-zinc-400">Result</Label>
+            <Label htmlFor="outcome-select" className="text-muted-foreground">Result</Label>
             <Select
               value={watch('outcome') ?? '__none'}
               onValueChange={(v) => setValue('outcome', v === '__none' || v === null ? undefined : (v as Outcome))}
+              items={{ __none: 'None', win: 'Win', loss: 'Loss', breakeven: 'Breakeven', open: 'Still open' }}
             >
-              <SelectTrigger className={cn('border-zinc-800 bg-[#0A0B0E] text-white', fieldRing('outcome'))}>
+              <SelectTrigger id="outcome-select" className={cn('border-border bg-background text-foreground', fieldRing('outcome'))}>
                 <SelectValue placeholder="Select outcome" />
               </SelectTrigger>
-              <SelectContent className="border-zinc-800 bg-[#12141A]">
-                <SelectItem value="__none" className="text-zinc-500">
+              <SelectContent className="border-border bg-card">
+                <SelectItem value="__none" className="text-muted-foreground">
                   None
                 </SelectItem>
-                <SelectItem value="win" className="text-white">
+                <SelectItem value="win" className="text-foreground">
                   Win
                 </SelectItem>
-                <SelectItem value="loss" className="text-white">
+                <SelectItem value="loss" className="text-foreground">
                   Loss
                 </SelectItem>
-                <SelectItem value="breakeven" className="text-white">
+                <SelectItem value="breakeven" className="text-foreground">
                   Breakeven
                 </SelectItem>
-                <SelectItem value="open" className="text-white">
-                  Still Open
+                <SelectItem value="open" className="text-foreground">
+                  Still open
                 </SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label className="text-zinc-400">PnL (USD)</Label>
+            <Label htmlFor="pnl_usd" className="text-muted-foreground">P&amp;L (USD)</Label>
             <Input
               type="number"
               step="any"
               placeholder="0.00"
+              id="pnl_usd"
               {...register('pnl_usd')}
-              className={cn('border-zinc-800 bg-[#0A0B0E] font-mono text-white', fieldRing('pnl_usd'))}
+              className={cn('border-border bg-background font-mono text-foreground', fieldRing('pnl_usd'))}
             />
           </div>
           <div className="space-y-2">
-            <Label className="text-zinc-400">PnL (Pips)</Label>
+            <Label htmlFor="pnl_pips" className="text-muted-foreground">P&amp;L (pips)</Label>
             <Input
               type="number"
               step="any"
               placeholder="0.0"
+              id="pnl_pips"
               {...register('pnl_pips')}
-              className="border-zinc-800 bg-[#0A0B0E] font-mono text-white"
+              className="border-border bg-background font-mono text-foreground"
             />
           </div>
           <div className="space-y-2">
-            <Label className="text-zinc-400">Exit Time</Label>
+            <Label htmlFor="exit_time" className="text-muted-foreground">Exit time</Label>
             <Input
               type="datetime-local"
+              id="exit_time"
               {...register('exit_time')}
-              className={cn('border-zinc-800 bg-[#0A0B0E] text-white', fieldRing('exit_time'))}
+              className={cn('border-border bg-background text-foreground', fieldRing('exit_time'))}
             />
           </div>
         </CardContent>
       </Card>
 
-      {/* Section 4 — Notes & Screenshots */}
-      <Card className="border-zinc-800 bg-[#12141A]">
+      {/* Section 4 — Notes &amp; screenshots */}
+      <Card className="border-border bg-card">
         <CardHeader className="pb-4">
-          <CardTitle className="text-base font-semibold text-white">
-            Notes & Screenshots
+          <CardTitle className="text-sm font-semibold text-foreground">
+            Notes &amp; screenshots
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label className="text-zinc-400">Notes</Label>
+            <Label htmlFor="notes" className="text-muted-foreground">Notes</Label>
             <Textarea
               placeholder="Trade rationale, observations…"
               rows={4}
+              id="notes"
               {...register('notes')}
-              className={cn('border-zinc-800 bg-[#0A0B0E] text-white placeholder:text-zinc-600', fieldRing('notes'))}
+              className={cn('border-border bg-background text-foreground placeholder:text-muted-foreground', fieldRing('notes'))}
             />
           </div>
           <div className="space-y-2">
-            <Label className="text-zinc-400">Tags (comma-separated)</Label>
+            <Label htmlFor="tags" className="text-muted-foreground">Tags (comma-separated)</Label>
             <Input
               placeholder="trend-follow, breakout, news-trade"
+              id="tags"
               {...register('tags')}
-              className={cn('border-zinc-800 bg-[#0A0B0E] text-white placeholder:text-zinc-600', fieldRing('tags'))}
+              className={cn('border-border bg-background text-foreground placeholder:text-muted-foreground', fieldRing('tags'))}
             />
           </div>
 
           {/* Screenshot upload */}
           <div className="space-y-2">
-            <Label className="text-zinc-400">Screenshots</Label>
+            <Label className="text-muted-foreground">Screenshots</Label>
             <div
               className={cn(
                 'flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-8 transition-colors',
                 isDragging
-                  ? 'border-[#00FF9C] bg-[#00FF9C]/10'
-                  : 'border-zinc-800 bg-[#0A0B0E] hover:border-zinc-700',
+                  ? 'border-primary bg-primary/10'
+                  : 'border-border bg-background hover:border-line-strong',
               )}
               onClick={() => fileInputRef.current?.click()}
               onDragOver={(e) => { e.preventDefault() }}
@@ -699,11 +727,11 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
                 void uploadFiles(e.dataTransfer.files)
               }}
             >
-              <Upload className="mb-2 h-6 w-6 text-zinc-500" />
-              <p className="text-sm text-zinc-400">
+              <Upload className="mb-2 h-6 w-6 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
                 {uploading ? 'Uploading…' : isDragging ? 'Drop images here' : 'Click, drag, or paste screenshots'}
               </p>
-              <p className="text-xs text-zinc-600">PNG, JPG up to 5MB</p>
+              <p className="text-xs text-muted-foreground">PNG, JPG up to 5MB</p>
             </div>
             <input
               ref={fileInputRef}
@@ -721,19 +749,20 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
                 {screenshots.map((url) => (
                   <div
                     key={url}
-                    className="group relative overflow-hidden rounded-md border border-zinc-800"
+                    className="group relative overflow-hidden rounded-md border border-border"
                   >
                     <img
                       src={url}
-                      alt="Screenshot"
+                      alt="Uploaded trade screenshot"
                       className="h-24 w-full object-cover"
                     />
                     <button
                       type="button"
                       onClick={() => removeScreenshot(url)}
-                      className="absolute right-1 top-1 rounded bg-[#0A0B0E]/80 p-1 opacity-0 transition-opacity group-hover:opacity-100"
+                      aria-label="Remove screenshot"
+                      className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded bg-background/85 text-foreground transition-colors hover:text-loss"
                     >
-                      <X className="h-3 w-3 text-[#FF4D4D]" />
+                      <X className="h-3.5 w-3.5" aria-hidden />
                     </button>
                   </div>
                 ))}
@@ -750,7 +779,7 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
               variant="outline"
               onClick={() => runExtraction(screenshots[0])}
               disabled={importing}
-              className="w-full border-[#00FF9C]/40 text-[#00FF9C] hover:bg-[#00FF9C]/10"
+              className="w-full border-primary/40 text-primary hover:bg-primary/10"
             >
               {importing ? (
                 <>
@@ -770,7 +799,7 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
         <Button
           type="button"
           variant="outline"
-          className="border-zinc-800 text-zinc-400"
+          className="border-border text-muted-foreground"
           onClick={() => router.back()}
         >
           Cancel
@@ -778,10 +807,10 @@ export function TradeForm({ trade, mode = 'create' }: TradeFormProps) {
         <Button
           type="submit"
           disabled={isSubmitting}
-          className="bg-[#00FF9C] text-[#0A0B0E] hover:bg-[#00FF9C]/90"
+          className="bg-primary text-primary-foreground hover:bg-primary/90"
         >
-          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {mode === 'edit' ? 'Update Trade' : 'Log Trade'}
+          {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+          {mode === 'edit' ? 'Save changes' : 'Log trade'}
         </Button>
       </div>
     </form>

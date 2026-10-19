@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service-client'
-import { getNimClient, NIM_MODEL_VISION, NIM_REQUEST_TIMEOUT_MS, withRateLimitRetry, mapWithConcurrency } from '@/lib/nim/client'
+import { getNimClient, NIM_MODEL_VISION, NIM_FALLBACK_MODEL, withRateLimitRetry, mapWithConcurrency } from '@/lib/nim/client'
 import { parseNimJson } from '@/lib/nim/parse-nim-json'
 import { base64FromUrl } from '@/lib/nim/extract-trade-from-image'
 import { buildTradeContext } from '@/lib/nim/build-trade-context'
@@ -28,7 +28,8 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { tradeId } = body
+    const { tradeId, regenerate } = body
+    const forceNew = regenerate === true
 
     if (!tradeId || typeof tradeId !== 'string') {
       return NextResponse.json(
@@ -58,7 +59,7 @@ export async function POST(request: Request) {
       .eq('trade_id', tradeId)
       .maybeSingle()
 
-    if (existing) {
+    if (existing && !forceNew) {
       return NextResponse.json({ review: existing })
     }
 
@@ -81,7 +82,7 @@ export async function POST(request: Request) {
       } catch {
         // Retry once with fallback model (text-only — drop screenshots)
         try {
-          return { key, review: await callNim(systemPrompt, tradeContext, null) }
+          return { key, review: await withRateLimitRetry(() => callNim(systemPrompt, tradeContext, null, NIM_FALLBACK_MODEL)) }
         } catch (error) {
           console.error(`[api/review] ${key} failed after retry:`, error)
           return { key, review: null }
@@ -106,21 +107,36 @@ export async function POST(request: Request) {
       ? Math.round((scoreSum / scoreCount) * 10) / 10
       : null
 
+    // Regenerating must never replace a good review with an all-failed one
+    if (existing && scoreCount === 0) {
+      return NextResponse.json(
+        { error: "The AI reviewers didn't respond. Your previous review was kept — try again in a minute." },
+        { status: 502 },
+      )
+    }
+
+    const reviewRow = {
+      prop_firm_evaluator: reviewData.prop_firm_evaluator,
+      trading_psychologist: reviewData.trading_psychologist,
+      institutional_trader: reviewData.institutional_trader,
+      quantitative_analyst: reviewData.quantitative_analyst,
+      risk_manager: reviewData.risk_manager,
+      composite_score: compositeScore,
+    }
+
     // Store in trade_reviews using the regular client (RLS-enforced, correct user_id)
-    const { data: inserted, error: insertError } = await supabase
-      .from('trade_reviews')
-      .insert({
-        trade_id: tradeId,
-        user_id: user.id,
-        prop_firm_evaluator: reviewData.prop_firm_evaluator,
-        trading_psychologist: reviewData.trading_psychologist,
-        institutional_trader: reviewData.institutional_trader,
-        quantitative_analyst: reviewData.quantitative_analyst,
-        risk_manager: reviewData.risk_manager,
-        composite_score: compositeScore,
-      })
-      .select()
-      .single()
+    const { data: inserted, error: insertError } = existing
+      ? await supabase
+          .from('trade_reviews')
+          .update({ ...reviewRow, created_at: new Date().toISOString() })
+          .eq('id', existing.id)
+          .select()
+          .single()
+      : await supabase
+          .from('trade_reviews')
+          .insert({ trade_id: tradeId, user_id: user.id, ...reviewRow })
+          .select()
+          .single()
 
     if (insertError) {
       console.error('[api/review] insert failed:', insertError)
@@ -146,6 +162,7 @@ async function callNim(
   systemPrompt: string,
   tradeContext: string,
   screenshotUrls: string[] | null | undefined,
+  model: string = NIM_MODEL_VISION,
 ): Promise<PersonalityReview> {
   // Attach up to 3 screenshots; gracefully skip ones that fail to load
   const images: Array<Record<string, unknown>> = []
@@ -172,9 +189,10 @@ async function callNim(
         ]
       : tradeContext
 
+  // Client default timeout (90s) — kimi-k3 reasons before answering and routinely exceeds 20s
   const completion = await getNimClient().chat.completions.create(
     {
-      model: NIM_MODEL_VISION,
+      model,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userContent as never },
@@ -182,7 +200,6 @@ async function callNim(
       max_tokens: 2048,
       temperature: 0.3,
     },
-    { timeout: NIM_REQUEST_TIMEOUT_MS },
   )
 
   const raw = completion.choices[0]?.message?.content

@@ -94,7 +94,7 @@ export function DrawToolbar({
   }
 
   return (
-    <div className="absolute left-2 top-2 z-20 flex flex-col gap-0.5 rounded-lg border border-[#27272A] bg-[#12141A]/95 p-1 shadow-lg">
+    <div className="absolute left-2 top-2 z-20 flex flex-col gap-0.5 rounded-lg border border-border bg-card/95 p-1 shadow-lg">
       <ToolButton label="Cursor / pan" active={activeTool === null} onClick={() => onSelectTool(null)}>
         <MousePointer2 className="h-4 w-4" />
       </ToolButton>
@@ -115,8 +115,8 @@ export function DrawToolbar({
                   aria-expanded={openGroup === group.key}
                   className={`flex h-7 w-7 items-center justify-center rounded transition-colors ${
                     groupActive || openGroup === group.key
-                      ? 'bg-[#00FF9C]/15 text-[#00FF9C]'
-                      : 'text-zinc-400 hover:bg-[#1C1E26] hover:text-zinc-100'
+                      ? 'bg-primary/15 text-primary'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                   }`}
                 />
               }
@@ -124,7 +124,7 @@ export function DrawToolbar({
               {group.railIcon}
             </PopoverTrigger>
             <PopoverContent side="right" align="start" className="w-auto p-1.5">
-              <p className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+              <p className="px-1 pb-1 text-xs font-medium text-muted-foreground">
                 {group.label}
               </p>
               <div className="flex flex-col">
@@ -136,14 +136,14 @@ export function DrawToolbar({
                     onClick={() => pick(tool)}
                     className={`flex items-center gap-2 rounded px-2 py-1.5 text-left text-xs transition-colors ${
                       activeTool === tool
-                        ? 'bg-[#00FF9C]/15 text-[#00FF9C]'
-                        : 'text-zinc-300 hover:bg-[#1C1E26] hover:text-zinc-100'
+                        ? 'bg-primary/15 text-primary'
+                        : 'text-foreground hover:bg-muted hover:text-foreground'
                     }`}
                   >
                     {icon}
                     <span>
                       {label}
-                      {hint && <span className="block text-[10px] text-zinc-500">{hint}</span>}
+                      {hint && <span className="block text-[11px] text-muted-foreground">{hint}</span>}
                     </span>
                   </button>
                 ))}
@@ -153,14 +153,14 @@ export function DrawToolbar({
         )
       })}
 
-      <div className="my-0.5 h-px bg-[#27272A]" />
+      <div className="my-0.5 h-px bg-border" />
       <ToolButton label={showDrawings ? 'Hide drawings' : 'Show drawings'} active={false} onClick={onToggleVisibility}>
-        {showDrawings ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4 text-zinc-500" />}
+        {showDrawings ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
       </ToolButton>
       <ToolButton label="Clear all drawings" active={false} onClick={onClearAll} danger>
         <Trash2 className="h-4 w-4" />
       </ToolButton>
-      <div className="my-0.5 h-px bg-[#27272A]" />
+      <div className="my-0.5 h-px bg-border" />
       {indicatorMenu}
     </div>
   )
@@ -188,10 +188,10 @@ function ToolButton({
       onClick={onClick}
       className={`flex h-7 w-7 items-center justify-center rounded transition-colors ${
         active
-          ? 'bg-[#00FF9C]/15 text-[#00FF9C]'
+          ? 'bg-primary/15 text-primary'
           : danger
-            ? 'text-zinc-400 hover:bg-[#FF4D4D]/10 hover:text-[#FF4D4D]'
-            : 'text-zinc-400 hover:bg-[#1C1E26] hover:text-zinc-100'
+            ? 'text-muted-foreground hover:bg-loss/10 hover:text-loss'
+            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
       }`}
     >
       {children}

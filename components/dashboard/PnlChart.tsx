@@ -12,6 +12,10 @@ import {
 } from 'recharts'
 import { Card, CardContent } from '@/components/ui/card'
 import type { TradeWithScore } from '@/lib/actions/dashboard'
+import { formatUsd, pnlTone } from '@/lib/format'
+
+const compactUsd = (v: number) =>
+  `${v < 0 ? '\u2212' : ''}$${Math.abs(v) >= 1000 ? `${(Math.abs(v) / 1000).toFixed(1)}k` : Math.abs(v).toFixed(0)}`
 
 interface PnlChartProps {
   trades: TradeWithScore[]
@@ -36,9 +40,9 @@ export function PnlChart({ trades }: PnlChartProps) {
 
   if (data.length === 0) {
     return (
-      <Card className="border-zinc-800 bg-[#12141A]">
-        <CardContent className="flex h-72 items-center justify-center p-6">
-          <p className="text-sm text-zinc-500">No PnL data yet</p>
+      <Card className="border-border bg-card">
+        <CardContent className="flex h-72 items-center justify-center p-5">
+          <p className="text-sm text-muted-foreground">No closed trades to chart yet</p>
         </CardContent>
       </Card>
     )
@@ -50,16 +54,12 @@ export function PnlChart({ trades }: PnlChartProps) {
   const gradientId = 'pnlGradient'
 
   return (
-    <Card className="border-zinc-800 bg-[#12141A]">
-      <CardContent className="p-6">
+    <Card className="border-border bg-card">
+      <CardContent className="p-5">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-white">Cumulative PnL</h3>
-          <span
-            className={`font-mono text-sm font-bold ${
-              isProfit ? 'text-[#00FF9C]' : 'text-[#FF4D4D]'
-            }`}
-          >
-            ${finalPnl.toFixed(2)}
+          <h3 className="text-sm font-semibold text-foreground">Cumulative P&amp;L</h3>
+          <span className={`font-mono text-sm font-semibold ${pnlTone(finalPnl)}`}>
+            {formatUsd(finalPnl, { signed: true })}
           </span>
         </div>
         <div style={{ height: 240, minHeight: 240 }}>
@@ -74,15 +74,16 @@ export function PnlChart({ trades }: PnlChartProps) {
             <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
             <XAxis
               dataKey="time"
-              tick={{ fill: '#71717A', fontSize: 11 }}
+              tick={{ fill: '#8A8A94', fontSize: 11 }}
               tickLine={false}
               axisLine={{ stroke: '#27272A' }}
             />
             <YAxis
-              tick={{ fill: '#71717A', fontSize: 11 }}
+              tick={{ fill: '#8A8A94', fontSize: 11 }}
               tickLine={false}
               axisLine={{ stroke: '#27272A' }}
-              tickFormatter={(v: number) => `$${v}`}
+              tickFormatter={compactUsd}
+              width={56}
             />
             <Tooltip
               contentStyle={{
@@ -92,16 +93,16 @@ export function PnlChart({ trades }: PnlChartProps) {
                 color: '#E4E4E7',
                 fontSize: 12,
               }}
-              formatter={(value) => [`$${Number(value).toFixed(2)}`, 'PnL']}
+              formatter={(value) => [formatUsd(Number(value), { signed: true }), 'Cumulative P&L']}
             />
-            <ReferenceLine y={0} stroke="#71717A" strokeDasharray="3 3" />
+            <ReferenceLine y={0} stroke="#8A8A94" strokeDasharray="3 3" />
             <Area
               type="monotone"
               dataKey="pnl"
               stroke={strokeColor}
               strokeWidth={2}
               fill={`url(#${gradientId})`}
-              animationDuration={1200}
+              animationDuration={300}
             />
           </AreaChart>
         </ResponsiveContainer>

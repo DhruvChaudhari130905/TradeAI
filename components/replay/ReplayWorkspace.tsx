@@ -4,6 +4,7 @@
 // (desktop) / bottom sheet (mobile).
 
 import { useMemo, useState } from 'react'
+import { formatUsd, pnlTone } from '@/lib/format'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Keyboard, LogOut, SlidersHorizontal } from 'lucide-react'
@@ -35,9 +36,9 @@ import { endReplaySession } from '@/lib/actions/replay'
 import { ConfirmDialog } from './ConfirmDialog'
 
 const SAVE_STATUS_STYLES: Record<'saved' | 'saving' | 'error', { label: string; text: string }> = {
-  saved: { label: 'saved', text: 'text-zinc-500' },
-  saving: { label: 'saving…', text: 'text-zinc-400' },
-  error: { label: 'save failed', text: 'text-[#FF4D4D]' },
+  saved: { label: 'saved', text: 'text-muted-foreground' },
+  saving: { label: 'saving…', text: 'text-muted-foreground' },
+  error: { label: 'save failed', text: 'text-loss' },
 }
 
 interface ReplayWorkspaceProps {
@@ -297,22 +298,23 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
     )
   }
 
+  // Viewport minus the shell: phone top bar (3.5rem) + main padding (2.5rem); desktop main padding (3.5rem)
   return (
-    <div className="flex h-[calc(100dvh-4rem)] flex-col gap-3 lg:h-[calc(100dvh-3.5rem)]">
+    <div className="flex h-[calc(100dvh-6rem)] flex-col gap-3 lg:h-[calc(100dvh-3.5rem)]">
       {/* ── Account strip ── */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-[#27272A] bg-[#12141A] px-4 py-2">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-border bg-card px-4 py-2">
         <span className="font-mono text-sm font-bold">{config.pair}</span>
-        <AccountStat label="Balance" value={`$${session.state.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
+        <AccountStat label="Balance" value={formatUsd(session.state.balance)} />
         <AccountStat
           label="Equity"
-          value={`$${session.equity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          className={session.equity >= session.state.balance ? 'text-[#00FF9C]' : 'text-[#FF4D4D]'}
+          value={formatUsd(session.equity)}
+          className={pnlTone(Math.round((session.equity - session.state.balance) * 100) / 100)}
         />
-        <AccountStat label="Margin" value={`$${session.marginUsed.toFixed(2)}`} />
+        <AccountStat label="Margin" value={formatUsd(session.marginUsed)} />
         <AccountStat
           label="Free"
-          value={`$${freeMargin.toFixed(2)}`}
-          className={freeMargin < 0 ? 'text-[#FF4D4D]' : undefined}
+          value={formatUsd(freeMargin)}
+          className={freeMargin < 0 ? 'text-loss' : undefined}
         />
         <Button
           size="sm"
@@ -321,8 +323,8 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
           aria-pressed={tradeKeysArmed}
           suppressHydrationWarning
           title={`B/S/C hotkeys are ${tradeKeysArmed ? 'armed — they place orders' : 'disarmed — press to enable'}`}
-          className={`ml-auto h-7 border-[#27272A] px-2 text-xs ${
-            tradeKeysArmed ? 'border-[#00FF9C]/50 text-[#00FF9C]' : 'text-zinc-400'
+          className={`ml-auto h-7 border-border px-2 text-xs ${
+            tradeKeysArmed ? 'border-primary/50 text-primary' : 'text-muted-foreground'
           }`}
         >
           <Keyboard className="mr-1 h-3.5 w-3.5" /> Trade keys {tradeKeysArmed ? 'ON' : 'OFF'}
@@ -333,11 +335,11 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
           onClick={() => setShowHotkeyHelp((v) => !v)}
           aria-expanded={showHotkeyHelp}
           aria-label="Toggle hotkey help"
-          className="h-7 px-2 text-xs text-zinc-400"
+          className="h-7 px-2 text-xs text-muted-foreground"
         >
           <span aria-hidden className="font-mono">?</span>
         </Button>
-        <span role="status" aria-live="polite" className={`font-mono text-[10px] ${SAVE_STATUS_STYLES[session.saveStatus].text}`}>
+        <span role="status" aria-live="polite" className={`font-mono text-[11px] ${SAVE_STATUS_STYLES[session.saveStatus].text}`}>
           <span aria-hidden>●</span> {SAVE_STATUS_STYLES[session.saveStatus].label}
         </span>
         <Button
@@ -345,9 +347,9 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
           variant="outline"
           onClick={() => setConfirmEnd(true)}
           disabled={ending}
-          className="border-[#27272A] text-xs"
+          className="border-border text-xs"
         >
-          <LogOut className="mr-1 h-3.5 w-3.5" /> End Session
+          <LogOut className="mr-1 h-3.5 w-3.5" aria-hidden /> End session
         </Button>
       </div>
 
@@ -371,7 +373,7 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
 
       {/* ── Chart + right rail ── */}
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[1fr_340px]">
-        <div className="relative min-h-[320px] rounded-lg border border-[#27272A] bg-[#0A0B0E] lg:min-h-0">
+        <div className="relative min-h-[320px] rounded-lg border border-border bg-background lg:min-h-0">
           <ChartPanel
             candles={session.visibleCandles}
             markers={markers}
@@ -427,18 +429,18 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
               render={
                 <Button
                   size="sm"
-                  className="absolute bottom-3 right-3 z-20 h-10 rounded-full bg-[#00FF9C] px-4 font-bold text-[#0A0B0E] shadow-lg hover:bg-[#00FF9C]/90 lg:hidden"
+                  className="absolute bottom-3 right-3 z-20 h-10 rounded-full bg-primary px-4 font-bold text-primary-foreground shadow-lg hover:bg-primary/90 lg:hidden"
                 />
               }
             >
               <SlidersHorizontal className="mr-1 h-4 w-4" /> Trade
             </SheetTrigger>
-            <SheetContent side="bottom" className="border-[#27272A] bg-[#12141A]">
+            <SheetContent side="bottom" className="border-border bg-card">
               <SheetHeader>
                 <SheetTitle className="text-sm">{config.pair}</SheetTitle>
               </SheetHeader>
               <Tabs defaultValue="trade" className="flex max-h-[75dvh] flex-col px-4 pb-6">
-                <TabsList className="mb-3 w-full bg-[#1C1E26]">
+                <TabsList className="mb-3 w-full bg-muted">
                   <TabsTrigger value="trade" className="flex-1 text-xs">Trade</TabsTrigger>
                   <TabsTrigger value="coach" className="flex-1 text-xs">AI Coach</TabsTrigger>
                 </TabsList>
@@ -446,7 +448,7 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
                   <div className="space-y-4 pb-2">
                     {tradingSection}
                     <div>
-                      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">Positions &amp; Orders</h3>
+                      <h3 className="mb-2 text-sm font-semibold text-foreground">Positions &amp; orders</h3>
                       {renderPositions(true)}
                     </div>
                   </div>
@@ -459,22 +461,22 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
           </Sheet>
         </div>
 
-        {/* Desktop right rail: AI Coach on top, Order Entry in the middle,
-            Positions & Orders (with closed trades) at the end — equal thirds */}
+        {/* Desktop right rail: Order entry first at its natural height (BUY/SELL never scroll
+            out of view), then Positions & orders, then the AI coach in the remaining space */}
         <aside className="hidden min-h-0 flex-col gap-3 lg:flex">
-          <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-[#27272A] bg-[#12141A] p-4">
-            {chatSection}
-          </div>
-          <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-[#27272A] bg-[#12141A] p-4">
-            <h3 className="mb-3 shrink-0 text-xs font-semibold uppercase tracking-wider text-zinc-500">Order Entry</h3>
-            <div className="min-h-0 flex-1 overflow-y-auto pr-1">{tradingSection}</div>
-          </div>
-          <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-[#27272A] bg-[#12141A] p-4">
-            <h3 className="mb-3 shrink-0 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              Positions &amp; Orders
+          <section className="shrink-0 rounded-lg border border-border bg-card p-4" aria-labelledby="order-entry-heading">
+            <h3 id="order-entry-heading" className="mb-3 text-sm font-semibold text-foreground">Order entry</h3>
+            {tradingSection}
+          </section>
+          <section className="flex min-h-0 flex-1 flex-col rounded-lg border border-border bg-card p-4" aria-labelledby="positions-heading">
+            <h3 id="positions-heading" className="mb-3 shrink-0 text-sm font-semibold text-foreground">
+              Positions &amp; orders
             </h3>
             <ScrollArea className="min-h-0 flex-1 pr-1">{renderPositions()}</ScrollArea>
-          </div>
+          </section>
+          <section className="flex min-h-0 flex-1 flex-col rounded-lg border border-border bg-card p-4">
+            {chatSection}
+          </section>
         </aside>
       </div>
 
@@ -489,7 +491,7 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
         description={
           <>
             <p>Positions stay as-is and the session becomes read-only.</p>
-            <p className={session.saveStatus === 'error' ? 'text-[#FF4D4D]' : 'text-zinc-400'}>
+            <p className={session.saveStatus === 'error' ? 'text-loss' : 'text-muted-foreground'}>
               {session.saveStatus === 'error'
                 ? 'Heads up: the latest autosave failed — progress since then may be lost.'
                 : session.saveStatus === 'saving'
@@ -518,9 +520,9 @@ export function ReplayWorkspace({ config, candlesByTf, resume }: ReplayWorkspace
 
 function AccountStat({ label, value, className }: { label: string; value: string; className?: string }) {
   return (
-    <span className="text-xs text-zinc-500">
+    <span className="text-xs text-muted-foreground">
       {label}{' '}
-      <span className={`font-mono text-zinc-100 ${className ?? ''}`}>{value}</span>
+      <span className={`font-mono text-foreground ${className ?? ''}`}>{value}</span>
     </span>
   )
 }
@@ -539,14 +541,14 @@ function HotkeyLegend({ tradeKeysArmed, onClose }: { tradeKeysArmed: boolean; on
     <div
       role="dialog"
       aria-label="Hotkey reference"
-      className="absolute bottom-3 left-3 z-30 w-64 rounded-lg border border-[#27272A] bg-[#12141A]/95 p-3 shadow-xl"
+      className="absolute bottom-3 left-3 z-30 w-64 rounded-lg border border-border bg-card/95 p-3 shadow-xl"
     >
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-semibold text-zinc-200">Hotkeys</span>
+        <span className="text-xs font-semibold text-foreground">Hotkeys</span>
         <button
           onClick={onClose}
           aria-label="Close hotkey help"
-          className="rounded px-1.5 py-0.5 font-mono text-xs text-zinc-500 hover:bg-[#1C1E26] hover:text-zinc-200"
+          className="rounded px-1.5 py-0.5 font-mono text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           Esc
         </button>
@@ -558,11 +560,11 @@ function HotkeyLegend({ tradeKeysArmed, onClose }: { tradeKeysArmed: boolean; on
           return (
             <div key={key} className={`flex items-center gap-2 ${dim ? 'opacity-50' : ''}`}>
               <dt>
-                <kbd className="min-w-7 rounded border border-[#27272A] bg-[#1C1E26] px-1.5 py-0.5 text-center font-mono text-[10px] text-zinc-200">
+                <kbd className="min-w-7 rounded border border-border bg-muted px-1.5 py-0.5 text-center font-mono text-[11px] text-foreground">
                   {key}
                 </kbd>
               </dt>
-              <dd className="text-xs text-zinc-400">
+              <dd className="text-xs text-muted-foreground">
                 {desc}
                 {dim ? ' (disarmed)' : ''}
               </dd>
@@ -571,13 +573,13 @@ function HotkeyLegend({ tradeKeysArmed, onClose }: { tradeKeysArmed: boolean; on
         })}
         <div className="flex items-center gap-2">
           <dt>
-            <kbd className="min-w-7 rounded border border-[#27272A] bg-[#1C1E26] px-1.5 py-0.5 text-center font-mono text-[10px] text-zinc-200">?</kbd>
+            <kbd className="min-w-7 rounded border border-border bg-muted px-1.5 py-0.5 text-center font-mono text-[11px] text-foreground">?</kbd>
           </dt>
-          <dd className="text-xs text-zinc-400">Toggle this help</dd>
+          <dd className="text-xs text-muted-foreground">Toggle this help</dd>
         </div>
       </dl>
       {!tradeKeysArmed && (
-        <p className="mt-2 border-t border-[#27272A] pt-2 text-[11px] text-zinc-500">
+        <p className="mt-2 border-t border-border pt-2 text-[11px] text-muted-foreground">
           Trade keys are disarmed. Turn them on with the switch in the account strip.
         </p>
       )}

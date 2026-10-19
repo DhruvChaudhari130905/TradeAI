@@ -34,11 +34,11 @@ export function AiScoreChart({ trades }: AiScoreChartProps) {
 
   if (data.length === 0) {
     return (
-      <Card className="border-zinc-800 bg-[#12141A]">
-        <CardContent className="flex h-72 items-center justify-center p-6">
+      <Card className="border-border bg-card">
+        <CardContent className="flex h-72 items-center justify-center p-5">
           <div className="text-center">
-            <p className="text-sm text-zinc-500">No AI scores yet</p>
-            <p className="mt-1 text-xs text-zinc-600">
+            <p className="text-sm text-muted-foreground">No AI scores yet</p>
+            <p className="mt-1 text-xs text-muted-foreground">
               Get trades reviewed to see your improvement trend
             </p>
           </div>
@@ -50,11 +50,11 @@ export function AiScoreChart({ trades }: AiScoreChartProps) {
   const avgScore = data.reduce((s, d) => s + d.score, 0) / data.length
 
   return (
-    <Card className="border-zinc-800 bg-[#12141A]">
-      <CardContent className="p-6">
+    <Card className="border-border bg-card">
+      <CardContent className="p-5">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-white">AI Score Trend</h3>
-          <span className="font-mono text-sm text-zinc-400">
+          <h3 className="text-sm font-semibold text-foreground">AI Score Trend</h3>
+          <span className="font-mono text-sm text-muted-foreground">
             avg {avgScore.toFixed(1)}/10
           </span>
         </div>
@@ -64,14 +64,14 @@ export function AiScoreChart({ trades }: AiScoreChartProps) {
             <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
             <XAxis
               dataKey="time"
-              tick={{ fill: '#71717A', fontSize: 11 }}
+              tick={{ fill: '#8A8A94', fontSize: 11 }}
               tickLine={false}
               axisLine={{ stroke: '#27272A' }}
             />
             <YAxis
               domain={[0, 10]}
               ticks={[0, 2, 4, 6, 8, 10]}
-              tick={{ fill: '#71717A', fontSize: 11 }}
+              tick={{ fill: '#8A8A94', fontSize: 11 }}
               tickLine={false}
               axisLine={{ stroke: '#27272A' }}
             />
@@ -98,7 +98,7 @@ export function AiScoreChart({ trades }: AiScoreChartProps) {
               strokeWidth={2}
               dot={{ r: 4, fill: '#8B5CF6', strokeWidth: 0 }}
               activeDot={{ r: 6, fill: '#8B5CF6', stroke: '#0A0B0E', strokeWidth: 2 }}
-              animationDuration={1200}
+              animationDuration={300}
             />
           </LineChart>
         </ResponsiveContainer>

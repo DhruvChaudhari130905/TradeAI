@@ -27,10 +27,10 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Refresh session on every request
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Refresh session on every request. getClaims verifies the JWT locally
+  // against the cached JWKS (ES256) instead of a round trip to Supabase Auth.
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims ?? null;
 
   const isProtected = PROTECTED_ROUTES.some((route) =>
     request.nextUrl.pathname.startsWith(route)

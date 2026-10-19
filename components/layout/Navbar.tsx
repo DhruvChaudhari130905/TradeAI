@@ -1,51 +1,31 @@
 "use client";
 
-import { Menu, User } from "lucide-react";
-import { signOut } from "@/lib/actions/auth";
+import Link from "next/link";
+import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/layout/Sidebar";
 
 interface NavbarProps {
-  username: string | null;
-  email: string | null;
   onMenuClick?: () => void;
 }
 
-export function Navbar({ username, email, onMenuClick }: NavbarProps) {
+/** Phone/tablet top bar — on desktop the sidebar carries logo and account */
+export function Navbar({ onMenuClick }: NavbarProps) {
   return (
-    <header className="flex h-14 items-center justify-between border-b border-zinc-800 bg-[#0A0B0E] px-4 sm:px-6">
+    <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-card px-2 sm:px-4 lg:hidden">
       <Button
         type="button"
         variant="ghost"
         size="icon"
         onClick={onMenuClick}
-        className="lg:hidden text-zinc-400 hover:bg-[#12141A] hover:text-white"
+        className="h-10 w-10 text-muted-foreground hover:bg-muted hover:text-foreground"
         aria-label="Open navigation"
       >
         <Menu className="h-5 w-5" />
       </Button>
-
-      <div className="ml-auto flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#12141A]">
-            <User className="h-4 w-4 text-zinc-400" />
-          </div>
-          <div className="hidden sm:block">
-            <p className="text-sm font-medium text-white">
-              {username ?? "Trader"}
-            </p>
-            <p className="text-xs text-zinc-500">{email ?? ""}</p>
-          </div>
-        </div>
-
-        <form action={signOut}>
-          <button
-            type="submit"
-            className="rounded-md px-3 py-1.5 text-sm text-zinc-400 transition-colors hover:bg-[#12141A] hover:text-white"
-          >
-            Sign out
-          </button>
-        </form>
-      </div>
+      <Link href="/dashboard" aria-label="TradeAI dashboard">
+        <Logo />
+      </Link>
     </header>
   );
 }

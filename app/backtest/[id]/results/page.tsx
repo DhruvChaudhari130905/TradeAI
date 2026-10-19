@@ -70,8 +70,8 @@ export default function ReplayResultsPage({ params }: { params: Promise<{ id: st
   if (error) {
     return (
       <div className="mx-auto max-w-md space-y-4 py-16 text-center">
-        <p className="text-sm text-[#FF4D4D]">{error}</p>
-        <Link href="/backtest" className="inline-flex h-9 items-center rounded-md border border-[#27272A] px-4 text-sm hover:bg-[#1C1E26]">
+        <p className="text-sm text-loss">{error}</p>
+        <Link href="/backtest" className="inline-flex h-9 items-center rounded-md border border-border px-4 text-sm hover:bg-muted">
           Back to sessions
         </Link>
       </div>
@@ -81,7 +81,7 @@ export default function ReplayResultsPage({ params }: { params: Promise<{ id: st
   if (!session || !stats) {
     return (
       <div className="flex items-center justify-center py-32">
-        <Loader2 className="h-6 w-6 animate-spin text-[#00FF9C]" />
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
       </div>
     )
   }
@@ -93,11 +93,11 @@ export default function ReplayResultsPage({ params }: { params: Promise<{ id: st
       {/* Header */}
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="font-mono text-xl font-bold">{session.pair}</h1>
-        <Badge variant="secondary" className="text-[10px] uppercase">{session.status}</Badge>
-        <span className="text-xs text-zinc-500">
+        <Badge variant="secondary" className="text-[11px] uppercase">{session.status}</Badge>
+        <span className="text-xs text-muted-foreground">
           {(session.timeframes as string[]).join(' · ')} · {session.date_from} → {session.date_to}
         </span>
-        <Link href="/backtest" className="ml-auto text-xs text-zinc-500 hover:text-zinc-100">
+        <Link href="/backtest" className="ml-auto text-xs text-muted-foreground hover:text-foreground">
           ← All sessions
         </Link>
       </div>
@@ -114,8 +114,8 @@ export default function ReplayResultsPage({ params }: { params: Promise<{ id: st
 
       {/* Equity curve */}
       {session.equity_curve.length > 1 && (
-        <div className="rounded-lg border border-[#27272A] bg-[#12141A] p-4">
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">Equity curve</h2>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <h2 className="mb-3 text-sm font-semibold text-foreground">Equity curve</h2>
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={session.equity_curve.map((p) => ({ ...p, label: p.time.slice(5, 16) }))}>
@@ -137,17 +137,17 @@ export default function ReplayResultsPage({ params }: { params: Promise<{ id: st
       )}
 
       {/* Trade list */}
-      <div className="rounded-lg border border-[#27272A] bg-[#12141A]">
-        <h2 className="border-b border-[#27272A] px-4 py-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+      <div className="rounded-lg border border-border bg-card">
+        <h2 className="border-b border-border px-4 py-3 text-sm font-semibold text-foreground">
           Trades ({session.closed_trades.length})
         </h2>
         {session.closed_trades.length === 0 ? (
-          <p className="px-4 py-6 text-center text-xs text-zinc-600">No trades taken this session.</p>
+          <p className="px-4 py-6 text-center text-xs text-muted-foreground">No trades taken this session.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left font-mono text-xs">
               <thead>
-                <tr className="border-b border-[#27272A] text-[10px] uppercase tracking-wider text-zinc-600">
+                <tr className="border-b border-border text-xs text-muted-foreground">
                   <th className="px-4 py-2 font-medium">Dir</th>
                   <th className="px-2 py-2 font-medium">Lots</th>
                   <th className="px-2 py-2 font-medium">Entry</th>
@@ -160,19 +160,19 @@ export default function ReplayResultsPage({ params }: { params: Promise<{ id: st
               </thead>
               <tbody>
                 {session.closed_trades.map((t) => (
-                  <tr key={t.id} className="border-b border-[#181A20] last:border-0">
-                    <td className={`px-4 py-2 font-bold ${t.direction === 'long' ? 'text-[#00FF9C]' : 'text-[#FF4D4D]'}`}>
+                  <tr key={t.id} className="border-b border-raised last:border-0">
+                    <td className={`px-4 py-2 font-bold ${t.direction === 'long' ? 'text-primary' : 'text-loss'}`}>
                       {t.direction === 'long' ? 'L' : 'S'}
                     </td>
                     <td className="px-2 py-2">{t.lotSize}</td>
-                    <td className="px-2 py-2 text-zinc-400">{t.entryPrice.toFixed(digits)}</td>
-                    <td className="px-2 py-2 text-zinc-400">{t.exitPrice.toFixed(digits)}</td>
-                    <td className="px-2 py-2 text-zinc-600 hidden sm:table-cell">{t.entryTime.slice(0, 16)}</td>
-                    <td className="px-2 py-2 text-zinc-400">{t.pnlPips >= 0 ? '+' : ''}{t.pnlPips.toFixed(1)}</td>
-                    <td className={`px-2 py-2 text-right font-bold ${t.pnlUsd >= 0 ? 'text-[#00FF9C]' : 'text-[#FF4D4D]'}`}>
+                    <td className="px-2 py-2 text-muted-foreground">{t.entryPrice.toFixed(digits)}</td>
+                    <td className="px-2 py-2 text-muted-foreground">{t.exitPrice.toFixed(digits)}</td>
+                    <td className="px-2 py-2 text-muted-foreground hidden sm:table-cell">{t.entryTime.slice(0, 16)}</td>
+                    <td className="px-2 py-2 text-muted-foreground">{t.pnlPips >= 0 ? '+' : ''}{t.pnlPips.toFixed(1)}</td>
+                    <td className={`px-2 py-2 text-right font-bold ${t.pnlUsd >= 0 ? 'text-primary' : 'text-loss'}`}>
                       {t.pnlUsd >= 0 ? '+' : ''}{t.pnlUsd.toFixed(2)}
                     </td>
-                    <td className="px-4 py-2 text-zinc-500 hidden md:table-cell">{t.exitReason.replace('_', ' ')}</td>
+                    <td className="px-4 py-2 text-muted-foreground hidden md:table-cell">{t.exitReason.replace('_', ' ')}</td>
                   </tr>
                 ))}
               </tbody>
@@ -182,16 +182,16 @@ export default function ReplayResultsPage({ params }: { params: Promise<{ id: st
       </div>
 
       {/* AI review */}
-      <div className="rounded-lg border border-[#27272A] bg-[#12141A] p-4">
+      <div className="rounded-lg border border-border bg-card p-4">
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          <Sparkles className="h-4 w-4 text-[#00FF9C]" />
+          <Sparkles className="h-4 w-4 text-primary" />
           <h2 className="text-sm font-semibold">AI Personality Review</h2>
           {reviews?.composite_score !== null && reviews !== null && (
             <Badge variant="secondary" className="font-mono">{reviews.composite_score}/10 composite</Badge>
           )}
           {reviews === null && session.closed_trades.length > 0 && (
             <Button size="sm" onClick={generateReview} disabled={generating}
-              className="ml-auto bg-[#00FF9C] text-[#0A0B0E] hover:bg-[#00FF9C]/90">
+              className="ml-auto bg-primary text-primary-foreground hover:bg-primary/90">
               {generating ? (
                 <>
                   <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> Reviewing…
@@ -204,7 +204,7 @@ export default function ReplayResultsPage({ params }: { params: Promise<{ id: st
         </div>
 
         {reviews === null ? (
-          <p className="py-2 text-xs text-zinc-600">
+          <p className="py-2 text-xs text-muted-foreground">
             {session.closed_trades.length === 0
               ? 'Take some trades in the session first.'
               : 'Five AI personalities will score this session on rule quality, risk management, consistency and robustness.'}
@@ -225,17 +225,17 @@ export default function ReplayResultsPage({ params }: { params: Promise<{ id: st
 
 function StatCard({ label, value, sub, positive, negative }: { label: string; value: string; sub?: string; positive?: boolean; negative?: boolean }) {
   return (
-    <div className="rounded-lg border border-[#27272A] bg-[#12141A] px-3 py-2.5">
-      <p className="text-[10px] uppercase tracking-wider text-zinc-600">{label}</p>
-      <p className={`font-mono text-base font-bold ${positive ? 'text-[#00FF9C]' : negative ? 'text-[#FF4D4D]' : ''}`}>{value}</p>
-      {sub && <p className="truncate font-mono text-[10px] text-zinc-600">{sub}</p>}
+    <div className="rounded-lg border border-border bg-card px-3 py-2.5">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className={`font-mono text-base font-bold ${positive ? 'text-primary' : negative ? 'text-loss' : ''}`}>{value}</p>
+      {sub && <p className="truncate font-mono text-[11px] text-muted-foreground">{sub}</p>}
     </div>
   )
 }
 
 function ReviewCard({ label, accent, review }: { label: string; accent: string; review: ReplayPersonalityReview }) {
   return (
-    <div className="rounded-lg border border-[#27272A] bg-[#1C1E26] p-3">
+    <div className="rounded-lg border border-border bg-muted p-3">
       <div className="flex items-center gap-2">
         <span className="h-2 w-2 rounded-full" style={{ backgroundColor: accent }} />
         <span className="text-xs font-semibold">{label}</span>
@@ -243,9 +243,9 @@ function ReviewCard({ label, accent, review }: { label: string; accent: string; 
           {review.overall}/10 · {review.grade}
         </span>
       </div>
-      <p className="mt-2 text-xs leading-relaxed text-zinc-400">{review.verdict}</p>
+      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{review.verdict}</p>
 
-      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 font-mono text-[10px] text-zinc-500">
+      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 font-mono text-[11px] text-muted-foreground">
         <span>Rule quality {review.rule_quality}/10</span>
         <span>Risk mgmt {review.risk_management}/10</span>
         <span>Consistency {review.strategy_consistency}/10</span>
@@ -258,7 +258,7 @@ function ReviewCard({ label, accent, review }: { label: string; accent: string; 
         <BulletList title="Improvements" items={review.improvements} color="#F59E0B" />
       </div>
 
-      <p className={`mt-2 text-[10px] font-semibold ${review.prop_firm_suitable ? 'text-[#00FF9C]' : 'text-[#FF4D4D]'}`}>
+      <p className={`mt-2 text-[11px] font-semibold ${review.prop_firm_suitable ? 'text-primary' : 'text-loss'}`}>
         {review.prop_firm_suitable ? '✓ Prop-firm suitable' : '✗ Not prop-firm suitable yet'}
       </p>
     </div>
@@ -269,10 +269,10 @@ function BulletList({ title, items, color }: { title: string; items: string[]; c
   if (!Array.isArray(items) || items.length === 0) return null
   return (
     <div>
-      <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color }}>{title}</p>
+      <p className="text-xs font-semibold" style={{ color }}>{title}</p>
       <ul className="mt-0.5 space-y-0.5">
         {items.map((item, i) => (
-          <li key={i} className="text-[11px] leading-snug text-zinc-400">• {item}</li>
+          <li key={i} className="text-[11px] leading-snug text-muted-foreground">• {item}</li>
         ))}
       </ul>
     </div>

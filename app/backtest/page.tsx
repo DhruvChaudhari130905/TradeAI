@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { Segmented } from '@/components/ui/segmented'
+import { formatUsd, pnlTone } from '@/lib/format'
 import { Play, Plus, Loader2, Trash2 } from 'lucide-react'
 import {
   createReplaySession,
@@ -159,17 +161,17 @@ export default function BacktestPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Replay Trading</h1>
-        <p className="mt-1 text-sm text-zinc-400">
-          Trade historical markets bar-by-bar like live price action. Practice setups, get AI feedback, log every trade.
+        <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">Replay</h1>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          Trade historical price action bar by bar. Every trade you place is logged to your journal as a replay trade.
         </p>
       </div>
 
       {/* ── Active sessions (resume) ── */}
       {activeSessions.length > 0 && (
-        <Card className="border-[#27272A] bg-[#12141A]">
+        <Card className="border-border bg-card">
           <CardHeader>
-            <CardTitle className="text-base">Resume Session</CardTitle>
+            <CardTitle className="text-sm font-semibold">Resume a session</CardTitle>
             <CardDescription>Pick up exactly where you left off.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -180,7 +182,7 @@ export default function BacktestPage() {
                 tabIndex={0}
                 onClick={() => router.push(`/backtest/${s.id}/session`)}
                 onKeyDown={(e) => { if (e.key === 'Enter') router.push(`/backtest/${s.id}/session`) }}
-                className="flex w-full cursor-pointer items-center justify-between rounded-lg border border-[#27272A] px-4 py-3 text-left transition-colors hover:border-[#00FF9C]/50 hover:bg-[#1C1E26]"
+                className="flex w-full cursor-pointer items-center justify-between rounded-lg border border-border px-4 py-3 text-left transition-colors hover:border-primary/50 hover:bg-muted"
               >
                 <div>
                   <span className="font-mono font-medium">{s.pair}</span>
@@ -189,8 +191,8 @@ export default function BacktestPage() {
                       <Badge key={tf} variant="secondary" className="font-mono text-xs">{tf}</Badge>
                     ))}
                   </span>
-                  <span className="block text-xs text-zinc-500">
-                    Balance ${Number(s.balance).toLocaleString()} · started {new Date(s.created_at).toLocaleDateString()}
+                  <span className="block text-xs text-muted-foreground">
+                    Balance {formatUsd(Number(s.balance))} · started {new Date(s.created_at).toLocaleDateString()}
                   </span>
                 </div>
                 <span className="flex items-center gap-2">
@@ -200,13 +202,13 @@ export default function BacktestPage() {
                     aria-label={`Delete ${s.pair} session`}
                     disabled={deletingId === s.id}
                     onClick={(e) => { e.stopPropagation(); handleDelete(s.id) }}
-                    className="h-8 w-8 text-zinc-500 hover:bg-[#FF4D4D]/10 hover:text-[#FF4D4D]"
+                    className="h-8 w-8 text-muted-foreground hover:bg-loss/10 hover:text-loss"
                   >
                     {deletingId === s.id
                       ? <Loader2 className="h-4 w-4 animate-spin" />
                       : <Trash2 className="h-4 w-4" />}
                   </Button>
-                  <Play className="h-4 w-4 text-[#00FF9C]" />
+                  <Play className="h-4 w-4 text-primary" />
                 </span>
               </div>
             ))}
@@ -215,45 +217,38 @@ export default function BacktestPage() {
       )}
 
       {/* ── New session ── */}
-      <Card className="border-[#27272A] bg-[#12141A]">
+      <Card className="border-border bg-card">
         <CardHeader>
-          <CardTitle className="text-base">New Replay Session</CardTitle>
+          <CardTitle className="text-sm font-semibold">New session</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
           {/* Market */}
           <div className="space-y-2">
-            <Label>Market</Label>
-            <div className="flex gap-2">
-              {(['forex', 'crypto'] as const).map((m) => (
-                <Button
-                  key={m}
-                  type="button"
-                  size="sm"
-                  variant={market === m ? 'default' : 'outline'}
-                  onClick={() => handleMarketChange(m)}
-                  className={market === m ? 'bg-[#00FF9C] text-[#0A0B0E]' : 'border-[#27272A]'}
-                >
-                  {m === 'forex' ? 'Forex' : 'Crypto'}
-                </Button>
-              ))}
-            </div>
+            <span className="block text-sm font-medium text-foreground">Market</span>
+            <Segmented
+              label="Market"
+              size="md"
+              value={market}
+              onChange={handleMarketChange}
+              options={[{ value: 'forex', label: 'Forex' }, { value: 'crypto', label: 'Crypto' }]}
+            />
           </div>
 
           {/* Pair */}
           <div className="space-y-2">
-            <Label>Pair</Label>
+            <Label htmlFor="pair-select">Pair</Label>
             <Select value={pair} onValueChange={handlePairChange}>
-              <SelectTrigger className="w-full border-[#27272A]">
+              <SelectTrigger id="pair-select" className="w-full border-border">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="max-h-64 border-[#27272A] bg-[#12141A]">
+              <SelectContent className="max-h-64 border-border bg-card">
                 {market === 'forex' ? (
                   <>
-                    <div className="px-2 py-1.5 text-xs font-medium text-zinc-500">Forex</div>
+                    <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Forex</div>
                     {FOREX_PAIRS.map((p) => (
                       <SelectItem key={p} value={p} className="font-mono">{p}</SelectItem>
                     ))}
-                    <div className="px-2 py-1.5 text-xs font-medium text-zinc-500">Commodities</div>
+                    <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Commodities</div>
                     {COMMODITY_PAIRS.map((p) => (
                       <SelectItem key={p} value={p} className="font-mono">{p}</SelectItem>
                     ))}
@@ -269,19 +264,20 @@ export default function BacktestPage() {
 
           {/* Timeframes */}
           <div className="space-y-2">
-            <Label>
-              Timeframes <span className="text-zinc-500">(up to 3 — lowest is the replay clock)</span>
-            </Label>
-            <div className="flex flex-wrap gap-2">
+            <span id="tf-label" className="block text-sm font-medium text-foreground">
+              Timeframes <span className="font-normal text-muted-foreground">· up to 3, the lowest drives the replay clock</span>
+            </span>
+            <div className="flex flex-wrap gap-1.5" role="group" aria-labelledby="tf-label">
               {TIMEFRAMES.map((tf) => (
                 <button
                   key={tf}
                   type="button"
                   onClick={() => toggleTimeframe(tf)}
-                  className={`rounded-md border px-3 py-1.5 font-mono text-sm transition-colors ${
+                  aria-pressed={timeframes.includes(tf)}
+                  className={`h-8 min-w-11 rounded-md border px-2.5 font-mono text-sm transition-colors duration-150 ${
                     timeframes.includes(tf)
-                      ? 'border-[#00FF9C] bg-[#00FF9C]/10 text-[#00FF9C]'
-                      : 'border-[#27272A] text-zinc-400 hover:border-zinc-600'
+                      ? 'border-primary/60 bg-primary/10 text-primary'
+                      : 'border-border text-muted-foreground hover:border-line-strong hover:text-foreground'
                   }`}
                 >
                   {tf}
@@ -291,10 +287,10 @@ export default function BacktestPage() {
           </div>
 
           {/* Date range — fixed window, server-assigned */}
-          <div className="rounded-md border border-[#27272A] bg-[#0A0B0E] px-3 py-2">
-            <p className="text-xs text-zinc-400">
-              Date range: fixed window · today back to{' '}
-              <span className="font-mono text-zinc-200">{rangeFromDate}</span>
+          <div className="rounded-md border border-border bg-background px-3 py-2">
+            <p className="text-xs text-muted-foreground">
+              Data window: today back to{' '}
+              <span className="font-mono text-foreground">{rangeFromDate}</span>
             </p>
           </div>
 
@@ -303,32 +299,33 @@ export default function BacktestPage() {
             <div className="space-y-2">
               <Label htmlFor="balance">Starting balance ($)</Label>
               <Input id="balance" type="number" min="1" value={balance} onChange={(e) => setBalance(e.target.value)}
-                className="border-[#27272A] font-mono" />
+                className="border-border font-mono" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="leverage">Leverage (1:x)</Label>
               <Input id="leverage" type="number" min="1" value={leverage} onChange={(e) => setLeverage(e.target.value)}
-                className="border-[#27272A] font-mono" />
+                className="border-border font-mono" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="spread">Spread ({market === 'crypto' ? '$' : 'pips'})</Label>
               <Input id="spread" type="number" step="any" min="0" value={spreadPips}
-                onChange={(e) => setSpreadPips(e.target.value)} className="border-[#27272A] font-mono" />
+                onChange={(e) => setSpreadPips(e.target.value)} className="border-border font-mono" />
             </div>
           </div>
 
           <Button
             onClick={handleCreate}
             disabled={creating}
-            className="w-full bg-[#00FF9C] text-[#0A0B0E] hover:bg-[#00FF9C]/90"
+            size="lg"
+            className="w-full gap-2"
           >
             {creating ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Fetching data…
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Loading price data…
               </>
             ) : (
               <>
-                <Plus className="mr-2 h-4 w-4" /> Start Session
+                <Plus className="h-4 w-4" aria-hidden /> Start session
               </>
             )}
           </Button>
@@ -337,9 +334,9 @@ export default function BacktestPage() {
 
       {/* ── Past sessions ── */}
       {pastSessions.length > 0 && (
-        <Card className="border-[#27272A] bg-[#12141A]">
+        <Card className="border-border bg-card">
           <CardHeader>
-            <CardTitle className="text-base">Past Sessions</CardTitle>
+            <CardTitle className="text-sm font-semibold">Past sessions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             {pastSessions.map((s) => (
@@ -349,23 +346,22 @@ export default function BacktestPage() {
                 tabIndex={0}
                 onClick={() => router.push(`/backtest/${s.id}/results`)}
                 onKeyDown={(e) => { if (e.key === 'Enter') router.push(`/backtest/${s.id}/results`) }}
-                className="flex w-full cursor-pointer items-center justify-between rounded-lg border border-[#27272A] px-4 py-3 text-left transition-colors hover:border-zinc-600 hover:bg-[#1C1E26]"
+                className="flex w-full cursor-pointer items-center justify-between rounded-lg border border-border px-4 py-3 text-left transition-colors hover:border-line-strong hover:bg-muted"
               >
                 <div>
                   <span className="font-mono font-medium">{s.pair}</span>
                   <Badge
                     variant="secondary"
                     className={`ml-2 text-xs ${
-                      s.status === 'complete' ? 'bg-[#00FF9C]/10 text-[#00FF9C]' : 'bg-zinc-800 text-zinc-400'
+                      s.status === 'complete' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
                     }`}
                   >
                     {s.status}
                   </Badge>
-                  <span className="block text-xs text-zinc-500">
-                    {new Date(s.created_at).toLocaleDateString()} · P&L{' '}
-                    <span className={`font-mono ${(Number(s.balance) - Number(s.starting_balance)) >= 0 ? 'text-[#00FF9C]' : 'text-[#FF4D4D]'}`}>
-                      {(Number(s.balance) - Number(s.starting_balance)) >= 0 ? '+' : ''}
-                      {Math.round(Number(s.balance) - Number(s.starting_balance)).toLocaleString()}
+                  <span className="block text-xs text-muted-foreground">
+                    {new Date(s.created_at).toLocaleDateString()} · P&amp;L{' '}
+                    <span className={`font-mono ${pnlTone(Number(s.balance) - Number(s.starting_balance))}`}>
+                      {formatUsd(Number(s.balance) - Number(s.starting_balance), { signed: true })}
                     </span>
                   </span>
                 </div>
@@ -375,7 +371,7 @@ export default function BacktestPage() {
                   aria-label={`Delete ${s.pair} session`}
                   disabled={deletingId === s.id}
                   onClick={(e) => { e.stopPropagation(); handleDelete(s.id) }}
-                  className="h-8 w-8 text-zinc-500 hover:bg-[#FF4D4D]/10 hover:text-[#FF4D4D]"
+                  className="h-8 w-8 text-muted-foreground hover:bg-loss/10 hover:text-loss"
                 >
                   {deletingId === s.id
                     ? <Loader2 className="h-4 w-4 animate-spin" />

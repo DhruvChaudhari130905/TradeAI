@@ -1,7 +1,7 @@
 import Link from 'next/link'
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
-import { ArrowRight, BookOpen } from 'lucide-react'
+import { ArrowRight, ArrowDownRight, ArrowUpRight } from 'lucide-react'
+import { formatUsd, pnlTone } from '@/lib/format'
 import type { TradeWithScore } from '@/lib/actions/dashboard'
 
 interface RecentTradesProps {
@@ -10,77 +10,61 @@ interface RecentTradesProps {
 
 export function RecentTrades({ trades }: RecentTradesProps) {
   return (
-    <Card className="border-zinc-800 bg-[#12141A]">
-      <CardContent className="p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-white">Recent Trades</h3>
+    <Card>
+      <CardContent className="p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-foreground">Recent trades</h3>
           <Link
             href="/journal"
-            className="flex items-center gap-1 text-xs text-zinc-500 transition-colors hover:text-[#00FF9C]"
+            className="flex items-center gap-1 rounded text-xs text-muted-foreground transition-colors hover:text-foreground"
           >
-            View all <ArrowRight className="h-3 w-3" />
+            View journal <ArrowRight className="h-3 w-3" aria-hidden />
           </Link>
         </div>
 
         {trades.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8">
-            <BookOpen className="h-8 w-8 text-zinc-700" />
-            <p className="mt-3 text-sm text-zinc-500">No trades yet</p>
-            <Link
-              href="/journal/new"
-              className="mt-2 text-xs text-[#00FF9C] transition-opacity hover:opacity-80"
-            >
-              Log your first trade →
+          <div className="py-8 text-center">
+            <p className="text-sm text-muted-foreground">No trades in this period.</p>
+            <Link href="/journal/new" className="mt-1 inline-block text-sm text-primary hover:underline">
+              Log a trade
             </Link>
           </div>
         ) : (
-          <div className="space-y-2">
+          <ul className="-mx-2 divide-y divide-border">
             {trades.map((trade) => {
-              const pnl = Number(trade.pnl_usd) || 0
+              const pnl = trade.pnl_usd != null ? Number(trade.pnl_usd) : null
               const score = trade.trade_reviews?.[0]?.composite_score
+              const long = trade.direction === 'long'
+              const DirIcon = long ? ArrowUpRight : ArrowDownRight
               return (
-                <Link
-                  key={trade.id}
-                  href={`/journal/${trade.id}`}
-                  className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-800/50 bg-[#0A0B0E] px-3 py-2.5 transition-colors hover:border-zinc-700 sm:flex-nowrap sm:gap-3"
-                >
-                  <span className="min-w-0 flex-1 font-mono text-xs font-semibold text-white sm:w-20 sm:flex-none">
-                    {trade.pair}
-                  </span>
-                  <Badge
-                    variant="outline"
-                    className={`w-16 justify-center text-[10px] ${
-                      trade.outcome === 'win'
-                        ? 'border-[#00FF9C]/30 text-[#00FF9C]'
-                        : trade.outcome === 'loss'
-                          ? 'border-[#FF4D4D]/30 text-[#FF4D4D]'
-                          : 'border-zinc-700 text-zinc-500'
-                    }`}
+                <li key={trade.id}>
+                  <Link
+                    href={`/journal/${trade.id}`}
+                    className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-0.5 rounded-md px-2 py-2.5 transition-colors hover:bg-muted/50 sm:grid-cols-[minmax(0,1fr)_7rem_6rem_3.5rem]"
                   >
-                    {trade.outcome
-                      ? trade.outcome.charAt(0).toUpperCase() + trade.outcome.slice(1)
-                      : '—'}
-                  </Badge>
-                  <span
-                    className={`ml-auto font-mono text-xs font-semibold ${
-                      pnl > 0
-                        ? 'text-[#00FF9C]'
-                        : pnl < 0
-                          ? 'text-[#FF4D4D]'
-                          : 'text-zinc-500'
-                    }`}
-                  >
-                    {pnl !== 0 ? `$${pnl.toFixed(2)}` : '—'}
-                  </span>
-                  {score != null && (
-                    <Badge className="bg-[#8B5CF6]/10 text-[#8B5CF6] border-0 text-[10px]">
-                      {score}/10
-                    </Badge>
-                  )}
-                </Link>
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="font-mono text-sm font-semibold text-foreground">{trade.pair}</span>
+                      <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
+                        <DirIcon className="h-3 w-3" aria-hidden />
+                        {long ? 'Long' : 'Short'}
+                      </span>
+                    </span>
+                    <span className={`text-right font-mono text-sm font-semibold sm:order-last ${pnlTone(pnl)}`}>
+                      {trade.outcome === 'open' ? 'Open' : formatUsd(pnl, { signed: true })}
+                    </span>
+                    <span className="text-xs text-muted-foreground sm:text-right">
+                      {trade.entry_time
+                        ? new Date(trade.entry_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                        : '—'}
+                    </span>
+                    <span className="text-right font-mono text-xs text-muted-foreground">
+                      {score != null ? `${Number(score).toFixed(1)}/10` : '—'}
+                    </span>
+                  </Link>
+                </li>
               )
             })}
-          </div>
+          </ul>
         )}
       </CardContent>
     </Card>

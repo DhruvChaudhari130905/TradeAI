@@ -9,8 +9,8 @@ import OpenAI from 'openai'
 export const NIM_MODEL_FAST = 'nvidia/nemotron-3.5-lightning-30b-a3b'
 export const NIM_MODEL_VISION = 'moonshotai/kimi-k3'
 export const NIM_MODEL_OMNI = 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning'
-/** Replacement for nemotron-3-nano-30b-a3b, which reached end-of-life 2026-09-01 */
-export const NIM_FALLBACK_MODEL = 'nvidia/nemotron-nano-3-30b-a3b'
+/** nemotron-nano-3-30b-a3b is listed but 404s for this account (2026-10-12) */
+export const NIM_FALLBACK_MODEL = 'nvidia/nemotron-3-super-120b-a12b'
 
 /** Cap for interactive (chat/suggestions) calls — fall back fast rather than hang */
 export const NIM_REQUEST_TIMEOUT_MS = 20_000
